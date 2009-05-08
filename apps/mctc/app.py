@@ -175,8 +175,27 @@ class App (rapidsms.app.App):
 
     @keyword(r'\@(\w+) (.+)')
     @authenticated
+    
+    #broken fix later
+    #def direct_message (self, message, target, text):
+    #    provider = self.find_provider(target)
+    #    try:
+    #        mobile = user.provider.mobile
+    #    except:
+    #        self.respond_not_registered(message, target)
+    #    sender = message.sender.username
+    #    return message.forward(mobile, "@%s> %s" % (sender, text))
+        
     def direct_message (self, message, target, text):
-        provider = self.find_provider(target)
+        try:
+            if re.match(r'^\d+$', target):
+                provider = Provider.objects.get(id=target)
+                user = provider.user
+            else:
+                user = User.objects.get(username__iexact=target)
+        except models.ObjectDoesNotExist:
+            # FIXME: try looking up a group
+            self.respond_not_registered(message, target)
         try:
             mobile = user.provider.mobile
         except:
@@ -409,6 +428,18 @@ class App (rapidsms.app.App):
         message.respond(_("Note added to case +%s.") % ref_id)
         log(case, "note_added")        
         return True
+    
+    # link case id to health id
+    #@keyword(r'id \+(\d+) ([\d\.]+) ([\d\.]+) ([\d\.]+) ([\d\.]+) ([\d\.]+)')
+    #@authenticated
+    #def health_id(self, message, ref_id, village, subvillage, homestead, household, member):
+    #    case = self.find_case(ref_id)
+    #    health_id = village + subvillage + homestead + household + member
+    #    case.health_id = health_id
+    #    case.save()
+    #    info = case.get_dictionary()
+    #    message.respond(_("Health ID #%(ref_id)s added for +%(ref_id)s %(first_name_short)s.%(last_name)s") % info)
+    #    message.respond(_("D> +%(ref_id)s %(first_name_short)s.%(last_name)s %(diagnosis)s%(labs_text)s") % info)
 
     @keyword(r'd \+(\d+ )(.*)')
     @authenticated
