@@ -35,6 +35,8 @@ admin.site.register(Provider)
 admin.site.register(Zone)
 admin.site.register(Facility)
 admin.site.register(Diagnosis)
+admin.site.register(Observation)
+
 
 class ReportMalnutritionAdmin(admin.ModelAdmin):
     list_display = ("case", "muac", "height", "weight", "entered_at")
