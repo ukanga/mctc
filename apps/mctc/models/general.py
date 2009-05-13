@@ -12,16 +12,22 @@ class Zone(models.Model):
     class Meta:
         app_label = "mctc"
     
-    CLUSTER_ZONE = 1
-    VILLAGE_ZONE = 2
-    SUBVILLAGE_ZONE = 3
+    DISTRICT_ZONE = 1
+    DIVISION_ZONE = 2
+    LOCATION_ZONE = 3
+    SUBLOCATION_ZONE = 4
+    VILLAGE_ZONE = 5
+    SUBVILLAGE_ZONE = 6
     ZONE_TYPES = (
-        (CLUSTER_ZONE, _('Cluster')),
+        (DISTRICT_ZONE, _('Cluster')),
+        (DIVISION_ZONE, _('Division')),
+        (LOCATION_ZONE, _('Location')),
+        (SUBLOCATION_ZONE, _('Sublocation')),        
         (VILLAGE_ZONE, _('Village')),
-        (SUBVILLAGE_ZONE, _('Sub village'))
+        (SUBVILLAGE_ZONE, _('Sub Village')),
     )
     
-    number = models.PositiveIntegerField(unique=True,db_index=True)
+    number = models.CharField(max_length=10,unique=True,db_index=True)
     name = models.CharField(max_length=255)
     head = models.ForeignKey("self", null=True,blank=True)
     category = models.IntegerField(choices=ZONE_TYPES, default=VILLAGE_ZONE)
