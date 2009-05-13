@@ -140,6 +140,7 @@ class Case(models.Model):
     )
     
     ref_id      = models.IntegerField(_('Case ID #'), null=True, db_index=True)
+    health_id   = models.CharField(_('Health ID #'), max_length=25, null=True, db_index=True)
     first_name  = models.CharField(max_length=255, db_index=True)
     last_name   = models.CharField(max_length=255, db_index=True)
     gender      = models.CharField(max_length=1, choices=GENDER_CHOICES)

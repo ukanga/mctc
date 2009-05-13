@@ -282,6 +282,21 @@ class App (rapidsms.app.App):
         message.respond(_("Case +%s cancelled.") % ref_id)
         log(message.sender.provider, "case_cancelled")        
         return True
+        
+    #link id
+    @keyword(r'id \+?(\d+) (\d+) (\d+) (\d+) (\d+) (\d+)')
+    @authenticated
+    # village subvillage homestead household person
+    def link_id(self, message, ref_id, village_id, subvillage_id, homestead_id, household_id, person_id):
+        case = self.find_case(ref_id)
+        health_id = village_id + subvillage_id + homestead_id + household_id + person_id
+        case.health_id = health_id
+        info = {}
+        info["ref_id"] = ref_id
+        info["health_id"] = health_id
+        case.save()
+        message.respond(_("Health ID #%(health_id)s added for patient +%(ref_id)s") % info)
+        return True
 
     @keyword(r'transfer \+?(\d+) (?:to )?\@?(\w+)')
     @authenticated
