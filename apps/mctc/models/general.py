@@ -6,9 +6,10 @@ from datetime import datetime
 import md5
 
 class Zone(models.Model):
+  
     def __unicode__ (self): 
-        return self.name
-
+        return self.name + " (" +self.number + ")"
+        
     class Meta:
         app_label = "mctc"
     
@@ -33,6 +34,7 @@ class Zone(models.Model):
     category = models.IntegerField(choices=ZONE_TYPES, default=VILLAGE_ZONE)
     lon = models.FloatField(null=True,blank=True)
     lat = models.FloatField(null=True,blank=True)
+    
 
 class Facility(models.Model):
     def __unicode__ (self): 
