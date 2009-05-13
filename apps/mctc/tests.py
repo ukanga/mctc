@@ -439,6 +439,10 @@ class TestApp (TestScript):
         7654322 < D> +91 D.JAMES Cholera
         7654321 < D> +91 Some test instructions
     """
+    test_15_link_id = """
+        7654322 > id +91 12 34 56 78 90
+        7654322 < Health ID #1234567890 added for patient +91
+    """
 
 class TestAlerts(TestCase):
     fixtures = ["users.json", "alerts.json"]
