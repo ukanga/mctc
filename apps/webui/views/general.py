@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 import time
 
 from urllib import quote, urlopen
-from apps.reusable_tables.table import get
+from apps.reusable_table.table import get
 
 # some webui defaults
 app = {}
