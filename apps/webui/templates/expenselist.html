@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+    <a href="/">{{ app.name }}</a>
+    &raquo; Expenses
+{% endblock %}
+
+{% block content %}
+
+<h2>Expenses</h2>
+{{ expense }}
+
+{% endblock %}
