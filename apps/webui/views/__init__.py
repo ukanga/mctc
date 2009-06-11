@@ -3,7 +3,7 @@ from apps.mctc.models.general import Case
 
 from apps.mctc.models.logs import MessageLog, EventLog
 from apps.mctc.models.general import Case, Zone, Provider
-from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis
+from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis, ReportDiarrhea
 
 register("case", Case, [
         ["Id", "ref_id", "{{ object.ref_id }}"],
@@ -34,6 +34,14 @@ register("malnutrition", ReportMalnutrition, [
         ["MUAC", "muac", "{{ object.muac }}"],
         ["Weight", "weight", "{{ object.weight }}"],
         ["Height", "height", "{{ object.height }}"],
+        ["Provider", "provider", "{{ object.provider.get_name_display }}"],
+        ["Created", "entered_at", '{{ object.entered_at|date:"d/m/Y" }}']
+        ])
+
+register("diarrhea", ReportDiarrhea, [
+        ["Status", "status", "{{ object.get_status_display }}"],
+        ["ORS", "ors", "{{ object.ors }}"],
+        ["Days", "days", "{{ object.days }}"],
         ["Provider", "provider", "{{ object.provider.get_name_display }}"],
         ["Created", "entered_at", '{{ object.entered_at|date:"d/m/Y" }}']
         ])

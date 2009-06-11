@@ -9,7 +9,7 @@ from django.db import connection
 
 from apps.mctc.models.logs import MessageLog, EventLog
 from apps.mctc.models.general import Case, Zone, Provider
-from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis
+from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis, ReportDiarrhea
 
 from apps.webui.shortcuts import as_html, login_required
 from apps.webui.forms.general import MessageForm
@@ -175,6 +175,7 @@ def case_view(request, object_id):
         ["diagnosis", Q(case=case)],
         ["malaria", Q(case=case)],
         ["event", Q(content_type="case", object_id=object_id)],
+        ["diarrhea", Q(case=case)],
         ])
 
     if nonhtml:
@@ -187,6 +188,7 @@ def case_view(request, object_id):
         "diagnosis": tables[1],
         "malaria": tables[2],
         "event": tables[3],
+        "diarrhea": tables[4],
     }
     return as_html(request, "caseview.html", context)
 

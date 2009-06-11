@@ -13,6 +13,8 @@ messages = {
     "provider_registered": _("Provider registered, awaiting confirmation"),
     "patient_created": _("Patient created"),
     "muac_taken": _("MUAC taken for the patient"),
+    "diarrhea_taken": _("DIARRHEA taken for the patient"),
+    "diarrhea_fu_taken": _("DIARRHEA follow-up received for the patient"),
     "mrdt_taken": _("MRDT taken for the patient"),
     "diagnosis_taken": _("Diagnosis taken for the patient"),    
     "user_logged_in": _("User logged into the user interface"),
