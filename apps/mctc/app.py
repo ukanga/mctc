@@ -560,7 +560,7 @@ class App (rapidsms.app.App):
 
 # DIARRHEA
     # follow up on diarrhea
-    @keyword(r'diarrhea \+(\d+) ([yn])')
+    @keyword(r'ors \+(\d+) ([yn])')
     @authenticated
     def followup_diarrhea(self, message, ref_id, is_ok):
         case    = self.find_case(ref_id)
@@ -598,7 +598,7 @@ class App (rapidsms.app.App):
         log(case, "diarrhea_fu_taken")
         return True
 
-    @keyword(r'diarrhea \+(\d+) ([yn]) (\d+)\s?([a-z\s]*)')
+    @keyword(r'ors \+(\d+) ([yn]) (\d+)\s?([a-z\s]*)')
     @authenticated
     def report_diarrhea(self, message, ref_id, ors, days, complications):
         case = self.find_case(ref_id)
