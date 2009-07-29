@@ -17,7 +17,10 @@ urlpatterns = patterns('',
     (r'^case/edit/(?P<object_id>\d+)/$', "django.views.generic.create_update.update_object", {
         "template_name": "caseedit.html",
         "form_class": CaseForm
-    }),
+    },
+),
+    (r'^reports/$', "apps.webui.views.general.globalreports_view"),
+    (r'^report/(?P<report_name>[a-z\-\_]+)/(?P<object_id>\d*)$', "apps.webui.views.general.report_view"),
     
     # since we can't change settings, we have to do this as accounts/login
     (r'^accounts/login/$', "apps.webui.views.login.login"),    

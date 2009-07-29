@@ -112,7 +112,7 @@ class Provider(models.Model):
                 "mobile": self.mobile,
                 "provider_mobile": self.mobile,
                 "provider_user": self.user,
-                "provider_name": self.user.first_name[0] + ' ' + self.user.last_name.upper(),
+                "provider_name": self.get_name_display(), #self.user.first_name[0] + ' ' + self.user.last_name.upper(),
                 "clinic": self.clinic.name,
                 "username": self.user.username
             }

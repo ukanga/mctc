@@ -20,6 +20,27 @@ import time
 from urllib import quote, urlopen
 from apps.reusable_tables.table import get
 
+# reportlab
+from django.template import Template, Context
+from django.template.loader import get_template
+from django.core.paginator import Paginator, InvalidPage
+from django.http import HttpResponse, HttpResponseRedirect
+try:
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    from reportlab.platypus import Table as PDFTable
+    from reportlab.platypus import TableStyle
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib import colors 
+except ImportError:
+    pass
+
+import os
+import csv
+import StringIO
+
+from tempfile import mkstemp
+
 # some webui defaults
 app = {}
 app['name'] = "RapidReport:Health"
@@ -236,3 +257,146 @@ def provider_view(request, object_id):
         "event": tables[2]
     }
     return as_html(request, "providerview.html", context)
+
+@login_required
+def globalreports_view(request):
+    context = {
+		"app": app,
+    }
+    return as_html(request, "globalreportsview.html", context)
+
+@login_required
+def report_view(request, report_name, object_id=None):
+    part = report_name.partition('_')
+    if part.__len__() == 3:
+        report_name = part[0]
+        format  = part[2]
+    else:
+        format  = 'csv'
+        
+    queryset, fields = build_report(report_name)
+    
+    filename    = "%(report)s_%(date)s.%(ext)s" % {'report':report_name, 'date': datetime.today().strftime("%Y-%m-%d"), 'ext':format}
+    
+    return eval("handle_%s" % format)(request, queryset, fields, filename)
+    
+def handle_csv(request, queryset, fields, file_name):
+    output = StringIO.StringIO()
+    csvio = csv.writer(output)
+    header = False
+    for row in queryset:
+        ctx = Context({"object": row })
+        if not header:
+            csvio.writerow([f["name"] for f in fields])
+            header = True
+        values = [ Template(h["bit"]).render(ctx) for h in fields ]
+        csvio.writerow(values)
+
+    response = HttpResponse(mimetype='text/csv')
+    response['Content-Disposition'] = "attachment; filename=%s" % file_name
+    response.write(output.getvalue())
+    return response
+    
+def handle_pdf(request, queryset, fields, file_name):
+
+    # this is again some quick and dirty sample code    
+    elements = []
+    styles = getSampleStyleSheet()
+    styles['Title'].alignment = TA_LEFT
+    styles['Title'].fontName = styles['Heading2'].fontName = "Helvetica"
+    styles["Normal"].fontName = "Helvetica"
+    filename = mkstemp(".pdf")[-1]
+    doc = SimpleDocTemplate(filename)
+
+    elements.append(Paragraph("MCTC", styles['Title']))
+    elements.append(Paragraph("%s List" % file_name, styles['Heading2'])) #
+
+    data = []
+    header = False
+    for row in queryset:
+        if not header:
+            data.append([f["name"] for f in fields])
+            header = True
+        ctx = Context({"object": row })
+        values = [ Template(h["bit"]).render(ctx) for h in fields ]
+        data.append(values)
+
+    table = PDFTable(data)
+    table.setStyle(TableStyle([
+        ('ALIGNMENT', (0,0), (-1,-1), 'LEFT'),
+        ('LINEBELOW', (0,0), (-1,-0), 2, colors.black),            
+        ('LINEBELOW', (0,1), (-1,-1), 0.8, colors.lightgrey),
+        ('FONT', (0,0), (-1, -1), "Helvetica"),
+        ('ROWBACKGROUNDS', (0,0), (-1, -1), [colors.whitesmoke, colors.white]),
+    ]))
+    elements.append(table)
+    elements.append(Paragraph("-", styles["Normal"]))
+    elements.append(Paragraph("Created: %s" % datetime.now().strftime("%d/%m/%Y"), styles["Normal"]))        
+    doc.build(elements)
+
+    response = HttpResponse(mimetype='application/pdf')
+    response['Content-Disposition'] = "attachment; filename=%s" % file_name
+    response.write(open(filename).read())
+    os.remove(filename)
+    return response
+    
+def build_report(report_name):
+
+    if report_name  == 'all-patient':
+    
+        qs      = []
+        cases   = Case.objects.all()
+        
+        for case in cases:
+            q   = {}
+            q['case']   = case
+            
+            try:
+                muacc   = ReportMalnutrition.objects.get(case=case)
+                q['malnut'] = u"%(diag)s on %(date)s" % {'diag': muacc.diagnosis_msg(), 'date': muacc.entered_at.strftime("%Y-%m-%d")}
+            except ObjectDoesNotExist:
+                q['malnut'] = None
+
+            try:
+                orsc   = ReportDiarrhea.objects.get(case=case)
+                q['diarrhea'] = u"%(diag)s on %(date)s" % {'diag': orsc.diagnosis_msg(), 'date': orsc.entered_at.strftime("%Y-%m-%d")}
+            except ObjectDoesNotExist:
+                q['diarrhea'] = None
+                
+            try:
+                mrdtc   = ReportMalaria.objects.get(case=case)
+                mrdtcd  = mrdtc.get_dictionary()
+                q['malaria'] = u"result:%(res)s bednet:%(bed)s obs:%(obs)s on %(date)s" % {'res': mrdtcd['result_text'], 'bed': mrdtcd['bednet_text'], 'obs': mrdtcd['observed'], 'date': mrdtc.entered_at.strftime("%Y-%m-%d")}
+            except ObjectDoesNotExist:
+                q['malaria'] = None
+                
+            try:
+                dc      = ReportDiagnosis.objects.get(case=case)
+                dcd     = dc.get_dictionary()
+                q['diagnosis'] = u"diag:%(diag)s labs:%(lab)s on %(date)s" % {'diag': dcd['diagnosis'], 'lab': dcd['labs_text'], 'date': dc.entered_at.strftime("%Y-%m-%d")}
+            except ObjectDoesNotExist:
+                q['diagnosis'] = None
+            
+            qs.append(q)
+        
+        fields = []
+        fields.append({"name": 'Ref#', "column": None, "bit": "{{ object.case.ref_id }}" })
+        fields.append({"name": 'Gender', "column": None, "bit": "{{ object.case.gender }}" })
+        fields.append({"name": 'Age', "column": None, "bit": "{{ object.case.age }}" })
+        fields.append({"name": 'Guardian', "column": None, "bit": "{{ object.case.guardian }}" })
+        fields.append({"name": 'Provider', "column": None, "bit": "{{ object.case.provider.get_name_display }}" })
+        fields.append({"name": 'Zone', "column": None, "bit": "{{ object.case.zone }}" })
+        fields.append({"name": 'Village', "column": None, "bit": "{{ object.case.village }}" })
+        fields.append({"name": 'District', "column": None, "bit": "{{ object.case.district }}" })
+        fields.append({"name": 'Malnutrition', "column": None, "bit": "{{ object.malnut }}" })
+        fields.append({"name": 'Diarrhea', "column": None, "bit": "{{ object.diarrhea }}" })
+        fields.append({"name": 'Malaria', "column": None, "bit": "{{ object.malaria }}" })
+        fields.append({"name": 'Diagnosis', "column": None, "bit": "{{ object.diagnosis }}" })
+        
+    else:
+        qs      = []
+        fields  = []
+    
+    return qs, fields
+
+
