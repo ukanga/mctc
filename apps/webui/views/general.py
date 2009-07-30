@@ -258,11 +258,51 @@ def provider_view(request, object_id):
     }
     return as_html(request, "providerview.html", context)
 
+def month_end(date):
+    for n in (31,30,28):
+        try:
+            return date.replace(day=n)
+        except: pass
+    return date
+
+def next_month(date):
+    if date.day > 28:
+        day     = 28
+    else:
+        day     = date.day
+    if date.month == 12:
+        month   = 1
+        year    = date.year + 1
+    else:
+        month   = date.month + 1
+        year    = date.year
+        
+    return date.replace(day=day, month=month, year=year)
+    
+def day_start(date):
+    t   = date.time().replace(hour=0,minute=1)
+    return datetime.combine(date.date(), t)
+
+def day_end(date):
+    t   = date.time().replace(hour=23,minute=59)
+    return datetime.combine(date.date(), t)
+
 @login_required
 def globalreports_view(request):
+
+    now = datetime.today()
+    first   = Case.objects.order_by('created_at')[:1][0]
+    date    = first.created_at
+
+    months=[]
+    while ((now - date).days > 0):
+        months.append({'id': date.strftime("%m%Y"), 'label': date.strftime("%B %Y"), 'date': date})
+        date = next_month(date)
+
     context = {
 		"app": app,
 	    "providers": Provider.objects.filter(active=True),
+	    "months": months
     }
     return as_html(request, "globalreportsview.html", context)
 
@@ -275,8 +315,12 @@ def report_view(request, report_name, object_id=None):
     else:
         format  = 'csv'
         
+    if report_name  == 'monitoring':
+        month   = datetime(int(object_id[2:6]), int(object_id[:2]), 1)
+        filename    = "%(report)s_%(date)s.%(ext)s" % {'report':report_name, 'date': month.strftime("%B-%Y"), 'ext':format}
+        return report_monitoring_csv(request, object_id, filename)
+        
     queryset, fields = build_report(report_name, object_id)
-    
     filename    = "%(report)s_%(date)s.%(ext)s" % {'report':report_name, 'date': datetime.today().strftime("%Y-%m-%d"), 'ext':format}
     
     return eval("handle_%s" % format)(request, queryset, fields, filename)
@@ -400,4 +444,81 @@ def build_report(report_name, object_id):
    
     return qs, fields
 
+def report_monitoring_csv(request, object_id, file_name):
+    output = StringIO.StringIO()
+    csvio = csv.writer(output)
+    header = False
+    
+    # parse parameter
+    month   = datetime(int(object_id[2:6]), int(object_id[:2]), 1)
+    
+    # Header Line (days of month)
+    eom = month_end(month)
+    days= range(-1, eom.day + 1)
+    days.remove(0)
+    gdays   = days # store that good list
+    csvio.writerow([d.__str__().replace("-1", month.strftime("%B")) for d in days])
+    
+    # Initialize Rows
+    sms_num     = ["# SMS Sent"]
+    sms_process = ["Processed"]
+    sms_refused = ["Refused"]
+    
+    chw_tot     = ["Total CHWs in System"]
+    chw_reg     = ["New CHWs Registered"]
+    chw_reg_err = ["Failed Registration"]
+
+    chw_on      = ["Active CHWS"]
+
+    patient_reg = ["New Patients Registered"]
+    patient_reg_err = ["Registration Failed"]
+
+    malaria_tot = ["Total Malaria Reports"]
+    malaria_err = ["Malaria Reports (Failed)"]
+
+    malaria_pos = ["Malaria Tests Positive"]
+    bednet_y_pos= ["Bednet Yes"]
+    bednet_n_pos= ["Bednet No"]
+    malaria_neg = ["Malaria Tests False"]
+    bednet_y_neg= ["Bednet Yes"]
+    bednet_n_neg= ["Bednet No"]
+
+    malnut_tot  = ["Total Malnutrition Reports"]
+    malnut_err  = ["Malnutrition Reports (Failed)"]
+
+    sam_tot     = ["Total SAM+"]
+    mam_tot     = ["Total MAM"]
+
+    samp_new    = ["New SAM+"]
+    sam_new     = ["New SAM"]
+    mam_new     = ["New MAM"]
+
+    user_msg    = ["User Messaging"]
+    
+    blank       = []
+
+    # List all rows    
+    rows    = [blank, sms_num, sms_process, sms_refused, blank, chw_tot, chw_reg, chw_reg_err, blank,
+    chw_on, blank, patient_reg, patient_reg_err, blank, malaria_tot, malaria_err, blank, 
+    malaria_pos, bednet_y_pos, bednet_n_pos, malaria_neg, bednet_y_neg, bednet_n_neg, blank,
+    malnut_tot, malnut_err, blank, sam_tot, mam_tot, blank, samp_new, sam_new, mam_new, blank, user_msg]
+    
+    # Loop on days
+    for d in gdays:
+        if d == -1: continue
+        ref_date    = datetime(month.year, month.month, d)
+        morning     = day_start(ref_date)
+        evening     = day_end(ref_date)
+        
+        # Number of SMS Sent
+        sms_num.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening).count())
+
+    # Write rows on CSV
+    for row in rows:
+        csvio.writerow([cell for cell in row])
+    
+    response = HttpResponse(mimetype='text/csv')
+    response['Content-Disposition'] = "attachment; filename=%s" % file_name
+    response.write(output.getvalue())
+    return response
 

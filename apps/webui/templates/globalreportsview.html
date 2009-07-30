@@ -23,5 +23,13 @@
 {% endfor %}
 </ul>
 
+<h2>Monitoring</h2>
+<p>General monitoring of {{ app.name }} activities.</p>
+<ul>
+{% for month in months %}
+<li><strong>{{ month.label }}</strong> Report, <a href="/report/monitoring_csv/{{ month.id }}">CSV</a></li>
+{% endfor %}
+</ul>
+
 {% endblock %}
 
