@@ -262,6 +262,7 @@ def provider_view(request, object_id):
 def globalreports_view(request):
     context = {
 		"app": app,
+	    "providers": Provider.objects.filter(active=True),
     }
     return as_html(request, "globalreportsview.html", context)
 
@@ -274,7 +275,7 @@ def report_view(request, report_name, object_id=None):
     else:
         format  = 'csv'
         
-    queryset, fields = build_report(report_name)
+    queryset, fields = build_report(report_name, object_id)
     
     filename    = "%(report)s_%(date)s.%(ext)s" % {'report':report_name, 'date': datetime.today().strftime("%Y-%m-%d"), 'ext':format}
     
@@ -340,63 +341,63 @@ def handle_pdf(request, queryset, fields, file_name):
     os.remove(filename)
     return response
     
-def build_report(report_name):
+def build_report(report_name, object_id):
 
+    qs      = []
+    fields  = []
+
+    # Patients Report
     if report_name  == 'all-patient':
-    
-        qs      = []
         cases   = Case.objects.all()
+    elif report_name == 'provider':
+        provider    = Provider.objects.filter(id=object_id)
+        cases   = Case.objects.filter(provider=provider)
+                
+    for case in cases:
+        q   = {}
+        q['case']   = case
         
-        for case in cases:
-            q   = {}
-            q['case']   = case
-            
-            try:
-                muacc   = ReportMalnutrition.objects.get(case=case)
-                q['malnut'] = u"%(diag)s on %(date)s" % {'diag': muacc.diagnosis_msg(), 'date': muacc.entered_at.strftime("%Y-%m-%d")}
-            except ObjectDoesNotExist:
-                q['malnut'] = None
+        try:
+            muacc   = ReportMalnutrition.objects.get(case=case)
+            q['malnut'] = u"%(diag)s on %(date)s" % {'diag': muacc.diagnosis_msg(), 'date': muacc.entered_at.strftime("%Y-%m-%d")}
+        except ObjectDoesNotExist:
+            q['malnut'] = None
 
-            try:
-                orsc   = ReportDiarrhea.objects.get(case=case)
-                q['diarrhea'] = u"%(diag)s on %(date)s" % {'diag': orsc.diagnosis_msg(), 'date': orsc.entered_at.strftime("%Y-%m-%d")}
-            except ObjectDoesNotExist:
-                q['diarrhea'] = None
-                
-            try:
-                mrdtc   = ReportMalaria.objects.get(case=case)
-                mrdtcd  = mrdtc.get_dictionary()
-                q['malaria'] = u"result:%(res)s bednet:%(bed)s obs:%(obs)s on %(date)s" % {'res': mrdtcd['result_text'], 'bed': mrdtcd['bednet_text'], 'obs': mrdtcd['observed'], 'date': mrdtc.entered_at.strftime("%Y-%m-%d")}
-            except ObjectDoesNotExist:
-                q['malaria'] = None
-                
-            try:
-                dc      = ReportDiagnosis.objects.get(case=case)
-                dcd     = dc.get_dictionary()
-                q['diagnosis'] = u"diag:%(diag)s labs:%(lab)s on %(date)s" % {'diag': dcd['diagnosis'], 'lab': dcd['labs_text'], 'date': dc.entered_at.strftime("%Y-%m-%d")}
-            except ObjectDoesNotExist:
-                q['diagnosis'] = None
+        try:
+            orsc   = ReportDiarrhea.objects.get(case=case)
+            q['diarrhea'] = u"%(diag)s on %(date)s" % {'diag': orsc.diagnosis_msg(), 'date': orsc.entered_at.strftime("%Y-%m-%d")}
+        except ObjectDoesNotExist:
+            q['diarrhea'] = None
             
-            qs.append(q)
+        try:
+            mrdtc   = ReportMalaria.objects.get(case=case)
+            mrdtcd  = mrdtc.get_dictionary()
+            q['malaria'] = u"result:%(res)s bednet:%(bed)s obs:%(obs)s on %(date)s" % {'res': mrdtcd['result_text'], 'bed': mrdtcd['bednet_text'], 'obs': mrdtcd['observed'], 'date': mrdtc.entered_at.strftime("%Y-%m-%d")}
+        except ObjectDoesNotExist:
+            q['malaria'] = None
+            
+        try:
+            dc      = ReportDiagnosis.objects.get(case=case)
+            dcd     = dc.get_dictionary()
+            q['diagnosis'] = u"diag:%(diag)s labs:%(lab)s on %(date)s" % {'diag': dcd['diagnosis'], 'lab': dcd['labs_text'], 'date': dc.entered_at.strftime("%Y-%m-%d")}
+        except ObjectDoesNotExist:
+            q['diagnosis'] = None
         
-        fields = []
-        fields.append({"name": 'Ref#', "column": None, "bit": "{{ object.case.ref_id }}" })
-        fields.append({"name": 'Gender', "column": None, "bit": "{{ object.case.gender }}" })
-        fields.append({"name": 'Age', "column": None, "bit": "{{ object.case.age }}" })
-        fields.append({"name": 'Guardian', "column": None, "bit": "{{ object.case.guardian }}" })
-        fields.append({"name": 'Provider', "column": None, "bit": "{{ object.case.provider.get_name_display }}" })
-        fields.append({"name": 'Zone', "column": None, "bit": "{{ object.case.zone }}" })
-        fields.append({"name": 'Village', "column": None, "bit": "{{ object.case.village }}" })
-        fields.append({"name": 'District', "column": None, "bit": "{{ object.case.district }}" })
-        fields.append({"name": 'Malnutrition', "column": None, "bit": "{{ object.malnut }}" })
-        fields.append({"name": 'Diarrhea', "column": None, "bit": "{{ object.diarrhea }}" })
-        fields.append({"name": 'Malaria', "column": None, "bit": "{{ object.malaria }}" })
-        fields.append({"name": 'Diagnosis', "column": None, "bit": "{{ object.diagnosis }}" })
-        
-    else:
-        qs      = []
-        fields  = []
+        qs.append(q)
     
+    fields.append({"name": 'Ref#', "column": None, "bit": "{{ object.case.ref_id }}" })
+    fields.append({"name": 'Gender', "column": None, "bit": "{{ object.case.gender }}" })
+    fields.append({"name": 'Age', "column": None, "bit": "{{ object.case.age }}" })
+    fields.append({"name": 'Guardian', "column": None, "bit": "{{ object.case.guardian }}" })
+    fields.append({"name": 'Provider', "column": None, "bit": "{{ object.case.provider.get_name_display }}" })
+    fields.append({"name": 'Zone', "column": None, "bit": "{{ object.case.zone }}" })
+    fields.append({"name": 'Village', "column": None, "bit": "{{ object.case.village }}" })
+    fields.append({"name": 'District', "column": None, "bit": "{{ object.case.district }}" })
+    fields.append({"name": 'Malnutrition', "column": None, "bit": "{{ object.malnut }}" })
+    fields.append({"name": 'Diarrhea', "column": None, "bit": "{{ object.diarrhea }}" })
+    fields.append({"name": 'Malaria', "column": None, "bit": "{{ object.malaria }}" })
+    fields.append({"name": 'Diagnosis', "column": None, "bit": "{{ object.diagnosis }}" })
+   
     return qs, fields
 
 

@@ -15,5 +15,13 @@
 <li><a href="/report/all-patient_pdf/">PDF Report</a></li>
 </ul>
 
+<h2>Providers</h2>
+<p>Per-provider reports with summary activities</p>
+<ul>
+{% for provider in providers %}
+<li><strong>{{ provider }}</strong>, <a href="/report/provider_csv/{{ provider.id }}">CSV</a>, <a href="/report/provider_pdf/{{ provider.id }}">PDF</a></li>
+{% endfor %}
+</ul>
+
 {% endblock %}
 
