@@ -60,8 +60,8 @@ class MessageLogAdmin(admin.ModelAdmin):
 admin.site.register(MessageLog, MessageLogAdmin)
 
 class EventLogAdmin(admin.ModelAdmin):
-    list_display = ("created_at", "message", "content_type")
-    list_filter = ("content_type", "message")
+    list_display = ("__unicode__",)
+    list_filter = ("message", "content_type")
     
 admin.site.register(EventLog, EventLogAdmin)
 

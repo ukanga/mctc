@@ -486,7 +486,8 @@ def report_monitoring_csv(request, object_id, file_name):
     malnut_tot  = ["Total Malnutrition Reports"]
     malnut_err  = ["Malnutrition Reports (Failed)"]
 
-    sam_tot     = ["Total SAM+"]
+    samp_tot     = ["Total SAM+"]
+    sam_tot     = ["Total SAM"]
     mam_tot     = ["Total MAM"]
 
     samp_new    = ["New SAM+"]
@@ -501,7 +502,7 @@ def report_monitoring_csv(request, object_id, file_name):
     rows    = [blank, sms_num, sms_process, sms_refused, blank, chw_tot, chw_reg, chw_reg_err, blank,
     chw_on, blank, patient_reg, patient_reg_err, blank, malaria_tot, malaria_err, blank, 
     malaria_pos, bednet_y_pos, bednet_n_pos, malaria_neg, bednet_y_neg, bednet_n_neg, blank,
-    malnut_tot, malnut_err, blank, sam_tot, mam_tot, blank, samp_new, sam_new, mam_new, blank, user_msg]
+    malnut_tot, malnut_err, blank, samp_tot, sam_tot, mam_tot, blank, samp_new, sam_new, mam_new, blank, user_msg]
     
     # Loop on days
     for d in gdays:
@@ -512,6 +513,83 @@ def report_monitoring_csv(request, object_id, file_name):
         
         # Number of SMS Sent
         sms_num.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening).count())
+        
+        # Number of SMS Processed
+        sms_process.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, was_handled=True).count())
+        
+        # Number of SMS Refused
+        sms_refused.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, was_handled=False).count())
+        
+        # Total # of CHW in System
+        chw_tot.append(Provider.objects.filter(role=Provider.CHW_ROLE,user__in=User.objects.filter(date_joined__lte=ref_date)).count())
+        
+        # New Registered CHW
+        chw_reg.append(Provider.objects.filter(role=Provider.CHW_ROLE,user__in=User.objects.filter(date_joined__gte=morning, date_joined__lte=evening)).count())
+        
+        # Failed CHW Registration
+        chw_reg_err.append(EventLog.objects.filter(created_at__gte=morning, created_at__lte=evening, message="provider_registered").count() - EventLog.objects.filter(created_at__gte=morning, created_at__lte=evening, message="confirmed_join").count())
+        
+        # Active CHWs
+        a = Case.objects.filter(created_at__gte=morning, created_at__lte=evening)
+        a.query.group_by = ['mctc_case.provider_id']
+        chw_on.append(a.__len__())
+        
+        # New Patient Registered
+        patient_reg.append(EventLog.objects.filter(created_at__gte=morning, created_at__lte=evening, message="patient_created").count())
+        
+        # Failed Patient Registration
+        patient_reg_err.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, text__startswith="new").count() - patient_reg[-1])
+        
+        # Total Malaria Reports
+        malaria_tot.append(EventLog.objects.filter(created_at__gte=morning, created_at__lte=evening, message="mrdt_taken").count())
+        
+        # Failed Malaria Reports
+        malaria_err.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, text__startswith="mrdt").count() - malaria_tot[-1])
+        
+        # Malaria Test Positive
+        malaria_pos.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=True).count())
+        
+        # Malaria Positive with Bednets
+        bednet_y_pos.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=True, bednet=True).count())
+        
+        # Malaria Positive without Bednets
+        bednet_n_pos.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=True, bednet=False).count())
+        
+        # Malaria Test Negative
+        malaria_neg.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=False).count())
+        
+        # Malaria Negative with Bednets
+        bednet_y_neg.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=False, bednet=True).count())
+        
+        # Malaria Negative without Bednets
+        bednet_n_neg.append(ReportMalaria.objects.filter(entered_at__gte=morning, entered_at__lte=evening, result=False, bednet=False).count())
+        
+        # Total Malnutrition Reports
+        malnut_tot.append(EventLog.objects.filter(created_at__gte=morning, created_at__lte=evening, message="muac_taken").count())
+        
+        # Failed Malnutrition Reports
+        malnut_err.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, text__startswith="muac").count() - malnut_tot[-1])
+        
+        # Total SAM+
+        samp_tot.append(ReportMalnutrition.objects.filter(entered_at__lte=evening, status=ReportMalnutrition.SEVERE_COMP_STATUS).count())
+        
+        # Total SAM
+        sam_tot.append(ReportMalnutrition.objects.filter(entered_at__lte=evening, status=ReportMalnutrition.SEVERE_STATUS).count())
+        
+        # Total MAM
+        mam_tot.append(ReportMalnutrition.objects.filter(entered_at__lte=evening, status=ReportMalnutrition.MODERATE_STATUS).count())
+        
+        # New SAM+
+        samp_new.append(ReportMalnutrition.objects.filter(entered_at__gte=morning, entered_at__lte=evening, status=ReportMalnutrition.SEVERE_COMP_STATUS).count())
+        
+        # New SAM
+        sam_new.append(ReportMalnutrition.objects.filter(entered_at__gte=morning, entered_at__lte=evening, status=ReportMalnutrition.SEVERE_STATUS).count())
+        
+        # New MAM
+        mam_new.append(ReportMalnutrition.objects.filter(entered_at__gte=morning, entered_at__lte=evening, status=ReportMalnutrition.MODERATE_STATUS).count())
+        
+        # User Messaging
+        user_msg.append(MessageLog.objects.filter(created_at__gte=morning, created_at__lte=evening, text__startswith="@").count())
 
     # Write rows on CSV
     for row in rows:
