@@ -178,7 +178,7 @@ class App (rapidsms.app.App):
     def direct_message (self, message, target, text):
         provider = self.find_provider(target)
         try:
-            mobile = user.provider.mobile
+            mobile = provider.mobile
         except:
             self.respond_not_registered(message, target)
         sender = message.sender.username
