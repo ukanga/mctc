@@ -58,7 +58,12 @@ class MessageLogAdmin(admin.ModelAdmin):
     list_filter = ("was_handled",)
     
 admin.site.register(MessageLog, MessageLogAdmin)
-admin.site.register(EventLog)
+
+class EventLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "message", "content_type")
+    list_filter = ("content_type", "message")
+    
+admin.site.register(EventLog, EventLogAdmin)
 
 class ReportDiarrheaAdmin(admin.ModelAdmin):
     list_display = ("case", "ors", "days", "entered_at", "status")
