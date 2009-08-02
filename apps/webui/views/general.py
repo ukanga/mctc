@@ -402,26 +402,26 @@ def build_report(report_name, object_id):
         q['case']   = case
         
         try:
-            muacc   = ReportMalnutrition.objects.get(case=case)
+            muacc   = ReportMalnutrition.objects.filter(case=case).latest()
             q['malnut'] = u"%(diag)s on %(date)s" % {'diag': muacc.diagnosis_msg(), 'date': muacc.entered_at.strftime("%Y-%m-%d")}
         except ObjectDoesNotExist:
             q['malnut'] = None
 
         try:
-            orsc   = ReportDiarrhea.objects.get(case=case)
+            orsc   = ReportDiarrhea.objects.filter(case=case).latest()
             q['diarrhea'] = u"%(diag)s on %(date)s" % {'diag': orsc.diagnosis_msg(), 'date': orsc.entered_at.strftime("%Y-%m-%d")}
         except ObjectDoesNotExist:
             q['diarrhea'] = None
             
         try:
-            mrdtc   = ReportMalaria.objects.get(case=case)
+            mrdtc   = ReportMalaria.objects.filter(case=case).latest()
             mrdtcd  = mrdtc.get_dictionary()
             q['malaria'] = u"result:%(res)s bednet:%(bed)s obs:%(obs)s on %(date)s" % {'res': mrdtcd['result_text'], 'bed': mrdtcd['bednet_text'], 'obs': mrdtcd['observed'], 'date': mrdtc.entered_at.strftime("%Y-%m-%d")}
         except ObjectDoesNotExist:
             q['malaria'] = None
             
         try:
-            dc      = ReportDiagnosis.objects.get(case=case)
+            dc      = ReportDiagnosis.objects.filter(case=case).latest('entered_at')
             dcd     = dc.get_dictionary()
             q['diagnosis'] = u"diag:%(diag)s labs:%(lab)s on %(date)s" % {'diag': dcd['diagnosis'], 'lab': dcd['labs_text'], 'date': dc.entered_at.strftime("%Y-%m-%d")}
         except ObjectDoesNotExist:
