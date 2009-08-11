@@ -4,7 +4,9 @@ from django.contrib.contenttypes import generic
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 
-from datetime import datetime
+from datetime import datetime, date
+
+from apps.mctc.models.general import Provider
 
 # since there's only ever going to be a limited number of message
 # on a strict one to one basis, lets just define them here,
@@ -13,6 +15,8 @@ messages = {
     "provider_registered": _("Provider registered, awaiting confirmation"),
     "patient_created": _("Patient created"),
     "muac_taken": _("MUAC taken for the patient"),
+    "diarrhea_taken": _("DIARRHEA taken for the patient"),
+    "diarrhea_fu_taken": _("DIARRHEA follow-up received for the patient"),
     "mrdt_taken": _("MRDT taken for the patient"),
     "diagnosis_taken": _("Diagnosis taken for the patient"),    
     "user_logged_in": _("User logged into the user interface"),
@@ -37,6 +41,9 @@ class EventLog(models.Model):
     def get_absolute_url(self):
         return self.content_object.get_absolute_url()
 
+    def __unicode__(self):
+        return u"%(date)s - %(msg)s (%(type)s)" % {'date': self.created_at, 'msg': self.message, 'type': self.content_type}
+
 def log(source, message):
     if not messages.has_key(message):
         raise ValueError, "No message: %s exists, please add to logs.py"
@@ -59,8 +66,62 @@ class MessageLog(models.Model):
     class Meta:
         app_label = "mctc"
         ordering = ("-created_at",)        
+        
+    def provider_number(self):
+        return self.provider.mobile
+    
+    def sent_by_name(self):
+        return "%s %s" %(self.sent_by.first_name, self.sent_by.last_name)
+
+    def provider_clinic(self):
+	p = Provider.objects.get(user=self.sent_by)
+	if p:
+	    return "%s"%p.clinic
+	return ""
 
     def save(self, *args):
         if not self.id:
             self.created_at = datetime.now()
         super(MessageLog, self).save(*args)
+    
+    @classmethod
+    def count_by_provider(cls,provider, duration_end=None,duration_start=None):
+        if provider is None:
+            return None
+        try:
+            if duration_start is None or duration_end is None:
+                return cls.objects.filter(provider=provider).count()
+            return cls.objects.filter(created_at__lte=duration_end, created_at__gte=duration_start).filter(sent_by=provider.user_id).count()
+        except models.ObjectDoesNotExist:
+            return None
+        
+    @classmethod
+    def count_processed_by_provider(cls,provider, duration_end=None,duration_start=None):
+        if provider is None:
+            return None
+        try:
+            if duration_start is None or duration_end is None:
+                return cls.objects.filter(provider=provider.user_id).count()
+            return cls.objects.filter(created_at__lte=duration_end, created_at__gte=duration_start).filter(sent_by=provider.user_id, was_handled=True).count()
+        except models.ObjectDoesNotExist:
+            return None
+    
+    @classmethod
+    def count_refused_by_provider(cls,provider, duration_end=None,duration_start=None):
+        if provider is None:
+            return None
+        try:
+            if duration_start is None or duration_end is None:
+                return cls.objects.filter(provider=provider).count()
+            return cls.objects.filter(created_at__lte=duration_end, created_at__gte=duration_start).filter(sent_by=provider.user_id, was_handled=True).count()
+        except models.ObjectDoesNotExist:
+            return None
+    
+    @classmethod
+    def days_since_last_activity(cls,provider):
+        today = date.today()
+        logs = MessageLog.objects.order_by("created_at").filter(created_at__lte=today,sent_by=provider.user_id).reverse()
+        if not logs:
+            return ""
+        return (today - logs[0].created_at.date()).days
+        

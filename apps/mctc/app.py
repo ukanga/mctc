@@ -15,7 +15,7 @@ from models.logs import MessageLog, log
 from models.general import Provider, User
 from models.general import Facility, Case, CaseNote, Zone
 
-from models.reports import ReportMalnutrition, ReportMalaria, Observation
+from models.reports import ReportMalnutrition, ReportMalaria, Observation, DiarrheaObservation, ReportDiarrhea
 from models.reports import ReportDiagnosis, Diagnosis, Lab, LabDiagnosis
 
 import re, time, datetime
@@ -175,33 +175,14 @@ class App (rapidsms.app.App):
 
     @keyword(r'\@(\w+) (.+)')
     @authenticated
-    
-    # this is broken need to fix
-    #def direct_message (self, message, target, text):
-    #    provider = self.find_provider(target)
-    #    try:
-    #        mobile = user.provider.mobile
-    #    except:
-    #        self.respond_not_registered(message, target)
-    #    sender = message.sender.username
-    #    return message.forward(mobile, "@%s> %s" % (sender, text))
-        
     def direct_message (self, message, target, text):
+        provider = self.find_provider(target)
         try:
-            if re.match(r'^\d+$', target):
-                provider = Provider.objects.get(id=target)
-                user = provider.user
-            else:
-                user = User.objects.get(username__iexact=target)
-        except models.ObjectDoesNotExist:
-            # FIXME: try looking up a group
-            self.respond_not_registered(message, target)
-        try:
-            mobile = user.provider.mobile
+            mobile = provider.mobile
         except:
             self.respond_not_registered(message, target)
         sender = message.sender.username
-        return message.forward(mobile, "@%s> %s" % (sender, text))        
+        return message.forward(mobile, "@%s> %s" % (sender, text))
 
     # Register a new patient
     @keyword(r'new (\S+) (\S+) ([MF]) ([\d\-]+)( \D+)?( \d+)?( z\d+)?')
@@ -238,8 +219,13 @@ class App (rapidsms.app.App):
             "zone"       : zone
         }
 
-        ## TODO: check to see if the case already exists
-
+        ## check to see if the case already exists
+        iscase = Case.objects.filter(first_name=info['first_name'], last_name=info['last_name'], provider=info['provider'], dob=info['dob'])
+        if iscase:
+            message.respond(_(
+            "%(last_name)s, %(first_name)s has already been registered by you.") % info)
+            # TODO: log this message
+            return True
         case = Case(**info)
         case.save()
 
@@ -281,21 +267,6 @@ class App (rapidsms.app.App):
         case.delete()
         message.respond(_("Case +%s cancelled.") % ref_id)
         log(message.sender.provider, "case_cancelled")        
-        return True
-        
-    #link id
-    @keyword(r'id \+?(\d+) (\d+) (\d+) (\d+) (\d+) (\d+)')
-    @authenticated
-    # village subvillage homestead household person
-    def link_id(self, message, ref_id, village_id, subvillage_id, homestead_id, household_id, person_id):
-        case = self.find_case(ref_id)
-        health_id = village_id + subvillage_id + homestead_id + household_id + person_id
-        case.health_id = health_id
-        info = {}
-        info["ref_id"] = ref_id
-        info["health_id"] = health_id
-        case.save()
-        message.respond(_("Health ID #%(health_id)s added for patient +%(ref_id)s") % info)
         return True
 
     @keyword(r'transfer \+?(\d+) (?:to )?\@?(\w+)')
@@ -592,6 +563,90 @@ class App (rapidsms.app.App):
         log(case, "mrdt_taken")        
         return True
 
+# DIARRHEA
+    # follow up on diarrhea
+    @keyword(r'ors \+(\d+) ([yn])')
+    @authenticated
+    def followup_diarrhea(self, message, ref_id, is_ok):
+        case    = self.find_case(ref_id)
+        is_ok   = True if is_ok == "y" else False
+
+        provider = message.sender.provider
+        report = ReportDiarrhea.objects.get(case=case)
+        
+        if is_ok:
+            report.status   = ReportDiarrhea.HEALTHY_STATUS
+            report.save()
+        else:
+            report.status   = ReportDiarrhea.SEVERE_STATUS
+            report.save()
+
+            info = report.case.get_dictionary()
+            info.update(report.get_dictionary())
+   
+            msg = _("%(diagnosis_msg)s. +%(ref_id)s %(last_name)s, %(first_name_short)s, %(gender)s/%(months)s (%(guardian)s). %(days)s, %(ors)s") % info
+            if report.observed.all().count() > 0: msg += ", " + info["observed"]
+            
+            message.respond("DIARRHEA> " + msg)
+
+        if report.status in (report.MODERATE_STATUS,
+                           report.SEVERE_STATUS,
+                           report.DANGER_STATUS):
+            alert = _("@%(username)s reports %(msg)s") % {"username":provider.user.username, "msg":msg}
+            recipients = [provider]
+            for query in (Provider.objects.filter(alerts=True),
+                          Provider.objects.filter(clinic=provider.clinic)):
+                for recipient in query:
+                    if recipient in recipients: continue
+                    recipients.append(recipient)
+                    message.forward(recipient.mobile, alert)
+        log(case, "diarrhea_fu_taken")
+        return True
+
+    @keyword(r'ors \+(\d+) ([yn]) (\d+)\s?([a-z\s]*)')
+    @authenticated
+    def report_diarrhea(self, message, ref_id, ors, days, complications):
+        case = self.find_case(ref_id)
+
+        ors     = True if ors == "y" else False
+        days    = int(days)
+
+        observed, choices = self.get_diarrheaobservations(complications)
+        self.delete_similar(case.reportdiarrhea_set)
+
+        provider = message.sender.provider
+        report = ReportDiarrhea(case=case, provider=provider, ors=ors, days=days)
+        report.save()
+        for obs in observed:
+            report.observed.add(obs)
+        report.diagnose()
+        report.save()
+
+        choice_term = dict(choices)
+
+        info = case.get_dictionary()
+        info.update(report.get_dictionary())
+
+        msg = _("%(diagnosis_msg)s. +%(ref_id)s %(last_name)s, %(first_name_short)s, %(gender)s/%(months)s (%(guardian)s). %(days)s, %(ors)s") % info
+
+        if observed: msg += ", " + info["observed"]
+
+        message.respond("DIARRHEA> " + msg)
+
+        if report.status in (report.MODERATE_STATUS,
+                           report.SEVERE_STATUS,
+                           report.DANGER_STATUS):
+            alert = _("@%(username)s reports %(msg)s") % {"username":provider.user.username, "msg":msg}
+            recipients = [provider]
+            for query in (Provider.objects.filter(alerts=True),
+                          Provider.objects.filter(clinic=provider.clinic)):
+                for recipient in query:
+                    if recipient in recipients: continue
+                    recipients.append(recipient)
+                    message.forward(recipient.mobile, alert)
+        log(case, "diarrhea_taken")
+        return True
+
     def delete_similar(self, queryset):
         try:
             last_report = queryset.latest("entered_at")
@@ -614,3 +669,18 @@ class App (rapidsms.app.App):
                 else:
                     observed.append(obj)
         return observed, choices
+
+    def get_diarrheaobservations(self, text):
+        choices  = dict( [ (o.letter, o) for o in DiarrheaObservation.objects.all() ] )
+        observed = []
+        if text:
+            text = re.sub(r'\W+', ' ', text).lower()
+            for observation in text.split(' '):
+                obj = choices.get(observation, None)
+                if not obj:
+                    if observation != 'n':
+                        raise HandlerFailed("Unknown observation code: %s" % observation)
+                else:
+                    observed.append(obj)
+        return observed, choices
+

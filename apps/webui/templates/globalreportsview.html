@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block breadcrumbs %}
+    <a href="/">{{app.name}}</a>   
+    &raquo; Reports
+{% endblock %}
+
+{% block content %}
+
+<h2>All Patients</h2>
+<p>All patients registered, all data.</p>
+<ul>
+<li><a href="/report/all-patient_csv/">CSV Report</a></li>
+<li>All Patients By Zone, By CHW <a href="/report/all-patient_pdf">PDF Report</a></li>
+<li>All Patients Per CHW <a href="/report/all-patient_pdf/1">PDF Report</a></li>
+<li>CHW Last 30 Days <a href="/report/chwstatus">PDF Report</a></li>
+</ul>
+
+<h2>Monitoring</h2>
+<p>General monitoring of {{ app.name }} activities.</p>
+<ul>
+{% for month in months %}
+<li><strong>{{ month.label }}</strong> Report, <a href="/report/monitoring_csv/{{ month.id }}">CSV</a></li>
+{% endfor %}
+</ul>
+
+<h2>Providers</h2>
+<p>Per-provider reports with summary activities</p>
+<ul>
+{% for provider in providers %}
+<li><strong>{{ provider }}</strong>, <a href="/report/provider_csv/{{ provider.id }}">CSV</a>, <a href="/report/provider_pdf/{{ provider.id }}">PDF</a></li>
+{% endfor %}
+</ul>
+
+{% endblock %}
+

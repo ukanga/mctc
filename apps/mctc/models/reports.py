@@ -3,8 +3,9 @@ from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 
 from apps.mctc.models.general import Case, Provider
+from apps.mctc.models.logs import MessageLog
 
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import md5
 
 class Report:
@@ -45,6 +46,18 @@ class Observation(models.Model):
 
     def __unicode__(self):
         return self.name
+
+class DiarrheaObservation(models.Model):
+    uid = models.CharField(max_length=15, primary_key=True)
+    name = models.CharField(max_length=255)
+    letter = models.CharField(max_length=2, unique=True)
+
+    class Meta:
+        app_label = "mctc"
+        ordering = ("name",)
+
+    def __unicode__(self):
+        return self.name
         
 class ReportMalaria(Report, models.Model):
     class Meta:
@@ -70,10 +83,42 @@ class ReportMalaria(Report, models.Model):
             'observed': ", ".join([k.name for k in self.observed.all()]),            
         }
         
+    def zone(self):
+        return self.case.zone.name
+        
+    def results_for_malaria_bednet(self):
+    	bednet = "N"
+    	if self.bednet is True:
+    	   bednet = "Y"	
+    	return "%s"%(bednet)
+
+    def results_for_malaria_result(self):
+    	result = "-"
+    	if self.bednet is True:
+    	   result = "+"	
+    	return "%s"%(result)
+
+    def name(self):
+        return "%s %s" % (self.case.first_name, self.case.last_name)
+    
+    def provider_number(self):
+        return self.provider.mobile
+        
     def save(self, *args):
         if not self.id:
             self.entered_at = datetime.now()
         super(ReportMalaria, self).save(*args)
+        
+    @classmethod
+    def count_by_provider(cls,provider, duration_end=None,duration_start=None):
+        if provider is None:
+            return None
+        try:
+            if duration_start is None or duration_end is None:
+                return cls.objects.filter(provider=provider).count()
+            return cls.objects.filter(entered_at__lte=duration_end, entered_at__gte=duration_start).filter(provider=provider).count()
+        except models.ObjectDoesNotExist:
+            return None
         
 class ReportMalnutrition(Report, models.Model):
     
@@ -112,9 +157,22 @@ class ReportMalnutrition(Report, models.Model):
             'diagnosis_msg' : self.diagnosis_msg(),
         }
                                
+                        
     def __unicode__ (self):
         return "#%d" % self.id
+        
+    def symptoms(self):
+      	return ", ".join([k.name for k in self.observed.all()])
     
+    def zone(self):
+        return self.case.zone.name
+        
+    def name(self):
+        return "%s %s" % (self.case.first_name, self.case.last_name) 
+        
+    def provider_number(self):
+        return self.provider.mobile
+            
     def diagnose (self):
         complications = [c for c in self.observed.all() if c.uid != "edema"]
         edema = "edema" in [ c.uid for c in self.observed.all() ]
@@ -143,7 +201,17 @@ class ReportMalnutrition(Report, models.Model):
         if not self.id:
             self.entered_at = datetime.now()
         super(ReportMalnutrition, self).save(*args)
-        
+       
+    @classmethod
+    def count_by_provider(cls,provider, duration_end=None,duration_start=None):
+        if provider is None:
+            return None
+        try:
+            if duration_start is None or duration_end is None:
+                return cls.objects.filter(provider=provider).count()
+            return cls.objects.filter(entered_at__lte=duration_end, entered_at__gte=duration_start).filter(provider=provider).count()
+        except models.ObjectDoesNotExist:
+            return None 
 
 class Lab(models.Model):
     name = models.CharField(max_length=255)
@@ -227,3 +295,112 @@ class ReportDiagnosis(Report, models.Model):
             "labs": ", ".join([str(d) for d in self.lab.all()]),
             "labs_text": ", ".join(extra)
         }
+
+class ReportDiarrhea(Report, models.Model):
+    
+    MODERATE_STATUS         = 1
+    DANGER_STATUS           = 2
+    SEVERE_STATUS           = 3
+    HEALTHY_STATUS          = 4
+    STATUS_CHOICES = (
+        (MODERATE_STATUS,   _('Moderate')),
+        (DANGER_STATUS,     _('Danger')),
+        (SEVERE_STATUS,     _('Severe')),
+        (HEALTHY_STATUS,    _("Healthy")),
+    )
+
+    case        = models.ForeignKey(Case, db_index=True)
+    provider    = models.ForeignKey(Provider, db_index=True)
+    entered_at  = models.DateTimeField(db_index=True)
+    ors         = models.BooleanField()
+    days        = models.IntegerField(_("Number of days"))    
+    observed    = models.ManyToManyField(DiarrheaObservation, blank=True)
+    status      = models.IntegerField(choices=STATUS_CHOICES, db_index=True, blank=True, null=True)
+    
+    class Meta:
+        app_label = "mctc"
+        verbose_name = "Diarrhea Report"
+        verbose_name_plural = "Diarrhea Reports"
+        get_latest_by = 'entered_at'
+        ordering = ("-entered_at",)
+
+    def get_dictionary(self):
+        return {
+            'ors'       : "ORS: %s" % ("yes" if self.ors else "no"),
+            'days'      : "Days: %d" % self.days,
+            'observed'  : ", ".join([k.name for k in self.observed.all()]),
+            'diagnosis' : self.get_status_display(),
+            'diagnosis_msg' : self.diagnosis_msg(),
+        }
+                               
+    def __unicode__ (self):
+        return "#%d" % self.id
+
+    def diagnose (self):
+        if self.days >= 3 or self.observed.all().count() > 0:
+            self.status = ReportDiarrhea.DANGER_STATUS
+        else:
+            self.status = ReportDiarrhea.MODERATE_STATUS
+
+    def diagnosis_msg(self):
+        if self.status == ReportDiarrhea.MODERATE_STATUS:
+            msg = "MOD Patient should take ORS."
+        elif self.status == ReportDiarrhea.SEVERE_STATUS:
+            msg = "SEV Patient must be referred at clinic."
+        elif self.status == ReportDiarrhea.DANGER_STATUS:
+            msg = "DANG Patient must go to Clinic."
+        else:
+            msg = "HEAL Patient not in danger."
+   
+        return msg
+
+    def save(self, *args):
+        if not self.id:
+            self.entered_at = datetime.now()
+        super(ReportDiarrhea, self).save(*args)
+        
+class ReportCHWStatus(Report, models.Model):
+    class Meta:
+        verbose_name = "CHW Perfomance Report"
+        app_label = "mctc"
+    @classmethod
+    def get_providers_by_clinic(cls, clinic_id=None):
+        thirty_days = timedelta(days=30)
+        today = date.today()
+        
+        duration_start = today - thirty_days
+        duration_end = today
+    
+        ps      = []
+        fields  = []
+        counter = 0
+        if clinic_id is not None:
+            providers = Provider.list_by_clinic(clinic_id)
+            for provider in providers:
+                p = {}
+                counter = counter + 1
+                p['counter'] = "%d"%counter
+                p['provider'] = provider
+                p['num_cases'] = Case.count_by_provider(provider)
+                p['num_malaria_reports'] = ReportMalaria.count_by_provider(provider, duration_end, duration_start)
+                p['num_muac_reports'] = ReportMalnutrition.count_by_provider(provider, duration_end, duration_start)
+                p['sms_sent'] = MessageLog.count_by_provider(provider, duration_end, duration_start)
+                p['sms_processed'] = MessageLog.count_processed_by_provider(provider, duration_end, duration_start)
+                p['sms_refused'] = MessageLog.count_refused_by_provider(provider, duration_end, duration_start)
+                if p['sms_sent'] != 0:
+                    p['sms_rate'] = int(float(float(p['sms_processed'])/float(p['sms_sent'])*100))
+                else:
+                    p['sms_rate'] = 0
+                #p['sms_rate'] = "%s%%"%p['sms_rate']
+                p['days_since_last_activity'] = MessageLog.days_since_last_activity(provider) 
+                                    
+                ps.append(p)
+                    # caseid +|Y lastname firstname | sex | dob/age | guardian | provider  | date
+            fields.append({"name": '#', "column": None, "bit": "{{ object.counter }}" })
+            fields.append({"name": 'PROVIDER', "column": None, "bit": "{{ object.provider }}" })
+            fields.append({"name": 'NUMBER OF CASES', "column": None, "bit": "{{ object.num_cases}}" })
+            fields.append({"name": 'MRDT', "column": None, "bit": "{{ object.num_malaria_reports }}" })
+            fields.append({"name": 'MUAC', "column": None, "bit": "{{ object.num_muac_reports }}" })
+            fields.append({"name": 'RATE', "column": None, "bit": "{{ object.sms_rate }}% ({{ object.sms_processed }}/{{ object.sms_sent }})" })
+            fields.append({"name": 'LAST ACTVITY', "column": None, "bit": "{{ object.days_since_last_activity }}" })
+            return ps, fields

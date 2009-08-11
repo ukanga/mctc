@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block title %}Status{% endblock %}
+
+{% block breadcrumbs %}
+    <a href="/">{{app.name}}</a>   
+    &raquo; Reports
+{% endblock %}
+
+{% block content %}
+
+
+<h2>CHW Status</h2>
+<p>Weekly Activity Status by CHW</p>
+<table>
+	<tr>
+	<th>Name</th><th># Cases</th><th>MRDT</th><th>MUAC</th><th># SMS</th><th>SMS Rate</th>
+	</tr>
+{%  for p in providers %}
+	
+	<tr><td><a href="/provider/view/{{p.provider.id}}/">{{ p.provider}}</a></td>
+		<td align=center>{{p.provider.clinic}}</td>
+		<td align=center>{{p.num_cases}}</td>
+		<td align=center>{{p.num_malaria_reports}}</td>
+		<td align=center>{{p.num_muac_reports}}</td>
+		<td align=center>{{p.sms_sent}}</td>
+		<td align=center>{{p.sms_rate}}% <i>({{p.sms_processed}}/{{p.sms_sent}})</i></td>
+
+	</tr>
+{% endfor %}
+</table>
+
+{% endblock %}

@@ -6,35 +6,30 @@ from datetime import datetime
 import md5
 
 class Zone(models.Model):
-  
     def __unicode__ (self): 
-        return self.name + " (" +self.number + ")"
-        
+        return self.name
+
     class Meta:
         app_label = "mctc"
     
-    DISTRICT_ZONE = 1
-    DIVISION_ZONE = 2
-    LOCATION_ZONE = 3
-    SUBLOCATION_ZONE = 4
-    VILLAGE_ZONE = 5
-    SUBVILLAGE_ZONE = 6
+    CLUSTER_ZONE = 1
+    VILLAGE_ZONE = 2
+    SUBVILLAGE_ZONE = 3
     ZONE_TYPES = (
-        (DISTRICT_ZONE, _('Cluster')),
-        (DIVISION_ZONE, _('Division')),
-        (LOCATION_ZONE, _('Location')),
-        (SUBLOCATION_ZONE, _('Sublocation')),        
+        (CLUSTER_ZONE, _('Cluster')),
         (VILLAGE_ZONE, _('Village')),
-        (SUBVILLAGE_ZONE, _('Sub Village')),
+        (SUBVILLAGE_ZONE, _('Sub village'))
     )
     
-    number = models.CharField(max_length=10,unique=True,db_index=True)
+    number = models.PositiveIntegerField(unique=True,db_index=True)
     name = models.CharField(max_length=255)
     head = models.ForeignKey("self", null=True,blank=True)
     category = models.IntegerField(choices=ZONE_TYPES, default=VILLAGE_ZONE)
     lon = models.FloatField(null=True,blank=True)
     lat = models.FloatField(null=True,blank=True)
     
+    def __unicode__ (self):
+        return self.name
 
 class Facility(models.Model):
     def __unicode__ (self): 
@@ -96,7 +91,6 @@ class Provider(models.Model):
     following_clinics = models.ManyToManyField(Facility, related_name="following_clinics", blank=True, null=True)
 
 
-
     def get_name_display(self):
         if self.user.first_name or self.user.last_name:
             return "%s %s" % (self.user.first_name, self.user.last_name)
@@ -120,7 +114,7 @@ class Provider(models.Model):
                 "mobile": self.mobile,
                 "provider_mobile": self.mobile,
                 "provider_user": self.user,
-                "provider_name": self.user.first_name[0] + ' ' + self.user.last_name.upper(),
+                "provider_name": self.get_name_display(), #self.user.first_name[0] + ' ' + self.user.last_name.upper(),
                 "clinic": self.clinic.name,
                 "username": self.user.username
             }
@@ -129,6 +123,12 @@ class Provider(models.Model):
     def by_mobile (cls, mobile):
         try:
             return cls.objects.get(mobile=mobile, active=True)
+        except models.ObjectDoesNotExist:
+            return None
+    @classmethod
+    def list_by_clinic(cls, clinic):
+        try:
+            return cls.objects.order_by("user").filter(clinic=clinic).all()
         except models.ObjectDoesNotExist:
             return None
 
@@ -142,7 +142,6 @@ class Case(models.Model):
     )
     
     ref_id      = models.IntegerField(_('Case ID #'), null=True, db_index=True)
-    health_id   = models.CharField(_('Health ID #'), max_length=25, null=True, db_index=True)
     first_name  = models.CharField(max_length=255, db_index=True)
     last_name   = models.CharField(max_length=255, db_index=True)
     gender      = models.CharField(max_length=1, choices=GENDER_CHOICES)
@@ -199,14 +198,25 @@ class Case(models.Model):
         now = datetime.now().date()
         return (now.year - self.dob.year, now.month - self.dob.month)
     
+    def date_registered(self):
+        return self.created_at.strftime("%d.%m.%Y")
+    
     def age(self):
         delta = datetime.now().date() - self.dob
+        """
         years = delta.days / 365.25
         if years > 3:
             return str(int(years))
-        else:
-            # FIXME: i18n
-            return str(int(delta.days/30.4375))+"m"
+        else:"""
+        # FIXME: i18n
+        return str(int(delta.days/30.4375))+"m"
+    
+    @classmethod
+    def count_by_provider(cls, provider):
+        try:
+            return cls.objects.filter(provider=provider).count()
+        except models.ObjectDoesNotExist:
+            return None
 
 class CaseNote(models.Model):
     case        = models.ForeignKey(Case, related_name="notes", db_index=True)

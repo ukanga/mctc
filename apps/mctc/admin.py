@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from models.general import Zone, Facility, Case, Provider, User 
 from models.logs import MessageLog, EventLog
-from models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis, Diagnosis, Observation
+from models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis, Diagnosis, Observation, DiarrheaObservation, ReportDiarrhea
 from django.utils.translation import ugettext_lazy as _
 
 class ProviderInline (admin.TabularInline):
@@ -28,23 +28,23 @@ except admin.sites.NotRegistered:
 admin.site.register(User, ProviderAdmin)
 
 class CaseAdmin(admin.ModelAdmin):
-    list_display = ("ref_id", "first_name", "last_name", "gender", "dob", "zone")
+    list_display = ("ref_id", "first_name", "last_name", "gender", "dob","zone","created_at")
+    search_fields = ['ref_id']
+    
 
 admin.site.register(Case, CaseAdmin)
 admin.site.register(Provider)
 admin.site.register(Zone)
 admin.site.register(Facility)
 admin.site.register(Diagnosis)
-admin.site.register(Observation)
-
 
 class ReportMalnutritionAdmin(admin.ModelAdmin):
-    list_display = ("case", "muac", "height", "weight", "entered_at")
+    list_display = ("case", "name","zone", "muac", "entered_at","provider","provider_number")
 
 admin.site.register(ReportMalnutrition, ReportMalnutritionAdmin)
 
 class ReportMalariaAdmin(admin.ModelAdmin):
-    list_display = ("case", "result", "bednet")
+    list_display = ("case","name","zone","result", "bednet","entered_at","provider","provider_number")
     verbose_name = "Malaria Report"
     verbose_name_plural = "Malaria Reports"
 
@@ -56,8 +56,22 @@ class ReportDiagnosisAdmin(admin.ModelAdmin):
 admin.site.register(ReportDiagnosis, ReportDiagnosisAdmin)
 
 class MessageLogAdmin(admin.ModelAdmin):
-    list_display = ("mobile", "sent_by", "text", "created_at", "was_handled")
+    list_display = ("sent_by_name","provider_clinic","mobile", "text", "created_at", "was_handled")
     list_filter = ("was_handled",)
     
 admin.site.register(MessageLog, MessageLogAdmin)
-admin.site.register(EventLog)
+
+class EventLogAdmin(admin.ModelAdmin):
+    list_display = ("__unicode__",)
+    list_filter = ("message", "content_type")
+    
+admin.site.register(EventLog, EventLogAdmin)
+
+class ReportDiarrheaAdmin(admin.ModelAdmin):
+    list_display = ("case", "ors", "days", "entered_at", "status")
+
+admin.site.register(ReportDiarrhea, ReportDiarrheaAdmin)
+
+admin.site.register(Observation)
+admin.site.register(DiarrheaObservation)
+

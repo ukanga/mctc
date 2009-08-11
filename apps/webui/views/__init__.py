@@ -1,9 +1,9 @@
-from apps.reusable_table.table import register
+from apps.reusable_tables.table import register
 from apps.mctc.models.general import Case
 
 from apps.mctc.models.logs import MessageLog, EventLog
 from apps.mctc.models.general import Case, Zone, Provider
-from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis
+from apps.mctc.models.reports import ReportMalnutrition, ReportMalaria, ReportDiagnosis, ReportDiarrhea
 
 register("case", Case, [
         ["Id", "ref_id", "{{ object.ref_id }}"],
@@ -12,7 +12,7 @@ register("case", Case, [
 		["Age", "age", "{{ object.age }}"],
         ["Provider", "provider", "{{ object.provider.get_name_display }}"],
         ["Zone", "zone", "{{ object.zone }}"],
-        ],20)
+        ])
 
 register("message", MessageLog, [
         ["About", "mobile", "{{ object.mobile }}"],
@@ -20,7 +20,7 @@ register("message", MessageLog, [
         ["Sent by", "sent_by", "{{ object.sent_by }}"],        
         ["Created", "created_at", '{{ object.created_at|date:"d/m/Y" }}'],
         ["Handled", "handled", "{{ object.get_handled_display }}"]
-        ],5)
+        ])
 
 register("event", EventLog, [
         ["About", "content_object", "{{ object.content_object }}"],
@@ -34,6 +34,14 @@ register("malnutrition", ReportMalnutrition, [
         ["MUAC", "muac", "{{ object.muac }}"],
         ["Weight", "weight", "{{ object.weight }}"],
         ["Height", "height", "{{ object.height }}"],
+        ["Provider", "provider", "{{ object.provider.get_name_display }}"],
+        ["Created", "entered_at", '{{ object.entered_at|date:"d/m/Y" }}']
+        ])
+
+register("diarrhea", ReportDiarrhea, [
+        ["Status", "status", "{{ object.get_status_display }}"],
+        ["ORS", "ors", "{{ object.ors }}"],
+        ["Days", "days", "{{ object.days }}"],
         ["Provider", "provider", "{{ object.provider.get_name_display }}"],
         ["Created", "entered_at", '{{ object.entered_at|date:"d/m/Y" }}']
         ])
@@ -63,4 +71,15 @@ register("provider", Provider, [
         ["Active", "active", "{{ object.get_active_display }}"],
         ["Alerts", "alerts", '{{ object.alerts }}'],
         ["Clinic", "clinic", '{{ object.clinic }}']
-        ], 20)
+        ])
+
+register("chwstatus", Provider, [
+        ["User", "user", "{{ object.user }}"],
+		["Role", "role", "{{ object.role}}"],
+        ["First Name", "first_name", "{{ object.user.first_name }}"],
+        ["Mobile", "mobile", "{{ object.mobile }}"],
+        ["Role", "diagnosis", "{{ object.role }}"],
+        ["Active", "active", "{{ object.get_active_display }}"],
+        ["Alerts", "alerts", '{{ object.alerts }}'],
+        ["Clinic", "clinic", '{{ object.clinic }}']
+        ])
