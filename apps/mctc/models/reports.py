@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 
@@ -403,4 +404,67 @@ class ReportCHWStatus(Report, models.Model):
             fields.append({"name": 'MUAC', "column": None, "bit": "{{ object.num_muac_reports }}" })
             fields.append({"name": 'RATE', "column": None, "bit": "{{ object.sms_rate }}% ({{ object.sms_processed }}/{{ object.sms_sent }})" })
             fields.append({"name": 'LAST ACTVITY', "column": None, "bit": "{{ object.days_since_last_activity }}" })
-            return ps, fields
+            return ps, fields        
+        
+class ReportAllPatients(Report, models.Model):
+    class Meta:
+        verbose_name = "CHW Perfomance Report"
+        app_label = "mctc"
+    @classmethod
+    def by_provider(cls, provider_id=None):    
+        qs      = []
+        fields  = []
+        counter = 0
+        if provider_id is not None:
+            cases   = Case.objects.order_by("last_name").filter(provider=provider_id)
+            
+            for case in cases:
+                q   = {}
+                q['case']   = case
+                counter = counter + 1
+                q['counter'] = "%d"%counter
+                try:
+                    muacc   = ReportMalnutrition.objects.filter(case=case).latest()
+                    #q['malnut'] = u"%(diag)s on %(date)s" % {'diag': muacc.diagnosis_msg(), 'date': muacc.entered_at.strftime("%Y-%m-%d")}
+                    q['malnut_muac'] = "%s (%smm)"%(muacc.get_status_display(), muacc.muac)
+                    q['malnut_symptoms'] = muacc.symptoms()
+                except ObjectDoesNotExist:
+                    q['malnut_muac'] = ""
+                    q['malnut_symptoms'] = ""
+        
+                try:
+                    orsc   = ReportDiarrhea.objects.filter(case=case).latest()
+                    q['diarrhea'] = u"%(diag)s on %(date)s" % {'diag': orsc.diagnosis_msg(), 'date': orsc.entered_at.strftime("%Y-%m-%d")}
+                except ObjectDoesNotExist:
+                    q['diarrhea'] = None
+                    
+                try:
+                    mrdtc   = ReportMalaria.objects.filter(case=case).latest()
+                    mrdtcd  = mrdtc.get_dictionary()
+                    #q['malaria'] = u"result:%(res)s bednet:%(bed)s obs:%(obs)s on %(date)s" % {'res': mrdtcd['result_text'], 'bed': mrdtcd['bednet_text'], 'obs': mrdtcd['observed'], 'date': mrdtc.entered_at.strftime("%Y-%m-%d")}
+                    q['malaria_result'] = mrdtc.results_for_malaria_result()
+                    q['malaria_bednet'] = mrdtc.results_for_malaria_bednet()
+                except ObjectDoesNotExist:
+                    q['malaria_result'] = ""
+                    q['malaria_bednet'] = ""
+                    
+                try:
+                    dc      = ReportDiagnosis.objects.filter(case=case).latest('entered_at')
+                    dcd     = dc.get_dictionary()
+                    q['diagnosis'] = u"diag:%(diag)s labs:%(lab)s on %(date)s" % {'diag': dcd['diagnosis'], 'lab': dcd['labs_text'], 'date': dc.entered_at.strftime("%Y-%m-%d")}
+                except ObjectDoesNotExist:
+                    q['diagnosis'] = None
+                
+                qs.append(q)
+            # caseid +|Y lastname firstname | sex | dob/age | guardian | provider  | date
+            fields.append({"name": '#', "column": None, "bit": "{{ object.counter }}" })
+            fields.append({"name": 'PID#', "column": None, "bit": "{{ object.case.ref_id }}" })
+            fields.append({"name": 'NAME', "column": None, "bit": "{{ object.case.last_name }} {{ object.case.first_name }}" })
+            fields.append({"name": 'SEX', "column": None, "bit": "{{ object.case.gender }}" })
+            fields.append({"name": 'AGE', "column": None, "bit": "{{ object.case.age }}" })
+            fields.append({"name": 'REGISTERED', "column": None, "bit": "{{ object.case.date_registered }}" })
+            fields.append({"name": 'MRDT', "column": None, "bit": "{{ object.malaria_result }}" })
+            fields.append({"name": 'BEDNET', "column": None, "bit": "{{ object.malaria_bednet }}" })
+            fields.append({"name": 'CMAM', "column": None, "bit": "{{ object.malnut_muac }}" })
+            fields.append({"name": 'SYMPTOMS', "column": None, "bit": "{{ object.malnut_symptoms}}" })
+            return qs, fields
