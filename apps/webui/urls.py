@@ -20,7 +20,7 @@ urlpatterns = patterns('',
     },
 ),
     (r'^status/$', "apps.webui.views.general.chwstatus_view"),
-    (r'^reports/$', "apps.webui.views.general.globalreports_view"),
+    (r'^reports/$', "apps.webui.views.report.reports"),
     (r'^report/(?P<report_name>[a-z\-\_]+)/(?P<object_id>\d*)$', "apps.webui.views.general.report_view"),
     
     (r'^reportlist/$', "apps.webui.views.report.reports"),
