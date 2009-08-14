@@ -98,6 +98,7 @@ class Provider(models.Model):
             return str(self.mobile)
         else:
             return str(self.id)
+    get_name_display.short_description = "Provider Name"
 
     def __unicode__(self):
         return self.get_name_display()

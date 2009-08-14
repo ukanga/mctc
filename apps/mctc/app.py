@@ -10,7 +10,7 @@ from rapidsms.parsers.keyworder import Keyworder
 from rapidsms.message import Message
 from rapidsms.connection import Connection
 
-from models.logs import MessageLog, log
+from models.logs import MessageLog, log, elog
 
 from models.general import Provider, User
 from models.general import Facility, Case, CaseNote, Zone
@@ -65,7 +65,7 @@ class App (rapidsms.app.App):
         except TypeError:
             # didn't find a matching function
             # make sure we tell them that we got a problem
-            message.respond(_("Unknown or incorrectly formed command: %(msg)s... Please call 999-9999") % {"msg":message.text[:10]})
+            message.respond(_("Unknown or incorrectly formed command: %(msg)s... Please re-check your message") % {"msg":message.text[:10]})
             return False
         try:
             handled = func(self, message, *captures)
@@ -76,6 +76,7 @@ class App (rapidsms.app.App):
             # TODO: log this exception
             # FIXME: also, put the contact number in the config
             message.respond(_("An error occurred. Please call 999-9999."))
+            elog(message.sender, message.text)
             raise
         message.was_handled = bool(handled)
         return handled
@@ -157,7 +158,14 @@ class App (rapidsms.app.App):
         self.respond_to_join(message, info)
         log(provider, "confirmed_join")
         return True
-
+    
+    @keyword(r'check system')
+    #@authenticated
+    def check_system_status (self, message):
+        mobile   = message.peer
+        message.respond(_("Hello %s, system is up.")% mobile)
+        return True
+    
     def respond_not_registered (self, message, target):
         raise HandlerFailed(_("User @%s is not registered.") % target)
 

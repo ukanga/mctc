@@ -367,9 +367,11 @@ class ReportCHWStatus(Report, models.Model):
     @classmethod
     def get_providers_by_clinic(cls, clinic_id=None):
         thirty_days = timedelta(days=30)
+        sixty_days = timedelta(days=60)
         today = date.today()
         
         duration_start = today - thirty_days
+        muac_duration_start = duration_start = today - sixty_days
         duration_end = today
     
         ps      = []
@@ -384,7 +386,8 @@ class ReportCHWStatus(Report, models.Model):
                 p['provider'] = provider
                 p['num_cases'] = Case.count_by_provider(provider)
                 p['num_malaria_reports'] = ReportMalaria.count_by_provider(provider, duration_end, duration_start)
-                p['num_muac_reports'] = ReportMalnutrition.count_by_provider(provider, duration_end, duration_start)
+                muac_percentage  = ReportMalnutrition.count_by_provider(provider, duration_end, muac_duration_start)/Case.count_by_provider(provider)
+                p['num_muac_reports'] = "%s %%"%muac_percentage
                 p['sms_sent'] = MessageLog.count_by_provider(provider, duration_end, duration_start)
                 p['sms_processed'] = MessageLog.count_processed_by_provider(provider, duration_end, duration_start)
                 p['sms_refused'] = MessageLog.count_refused_by_provider(provider, duration_end, duration_start)

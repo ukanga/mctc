@@ -44,6 +44,28 @@ class EventLog(models.Model):
     def __unicode__(self):
         return u"%(date)s - %(msg)s (%(type)s)" % {'date': self.created_at, 'msg': self.message, 'type': self.content_type}
 
+class SystemErrorLog(models.Model):
+    """ This is for exception errors """
+    message = models.CharField(max_length=500)
+    created_at  = models.DateTimeField(db_index=True)
+
+    class Meta:
+        app_label = "mctc"
+        ordering = ("-created_at",)
+
+    def get_absolute_url(self):
+        return self.content_object.get_absolute_url()
+
+    def __unicode__(self):
+        return u"%(date)s - %(msg)s (%(type)s)" % {'date': self.created_at, 'msg': self.message, 'type': self.content_type}
+
+def elog(source, message):    
+    ev = SystemErrorLog()    
+    ev.message = message
+    ev.created_at = datetime.now()
+    ev.save()
+
+
 def log(source, message):
     if not messages.has_key(message):
         raise ValueError, "No message: %s exists, please add to logs.py"

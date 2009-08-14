@@ -170,7 +170,7 @@ def reports(request):
 @login_required
 def last_30_days(request, object_id=None, per_page="0"):
     pdfrpt = GenPDFRrepot()
-    pdfrpt.setTitle("RapidResponse MVP Kenya: CHW Last 30 Days Perfomance Report")
+    pdfrpt.setTitle("RapidResponse MVP Kenya: CHW 30 Day Performance Report")
     if object_id is None:
         clinics = Provider.objects.values('clinic').distinct()
         for clinic in clinics:
