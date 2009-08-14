@@ -72,6 +72,7 @@ register("provider", Provider, [
         ["Alerts", "alerts", '{{ object.alerts }}'],
         ["Clinic", "clinic", '{{ object.clinic }}']
         ])
+<<<<<<< HEAD:apps/webui/views/__init__.py
 
 register("chwstatus", Provider, [
         ["User", "user", "{{ object.user }}"],
@@ -83,3 +84,5 @@ register("chwstatus", Provider, [
         ["Alerts", "alerts", '{{ object.alerts }}'],
         ["Clinic", "clinic", '{{ object.clinic }}']
         ])
+=======
+>>>>>>> 72ccab8eeb24b050344f257329844c7ec1373b68:apps/webui/views/__init__.py
