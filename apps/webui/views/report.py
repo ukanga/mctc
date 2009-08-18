@@ -28,7 +28,7 @@ from django.core.paginator import Paginator, InvalidPage
 from django.http import HttpResponse, HttpResponseRedirect
 
 from tempfile import mkstemp
-from datetime import datetime
+from datetime import datetime, timedelta, date
 import os
 import csv
 import StringIO
@@ -42,7 +42,15 @@ class GenPDFRrepot():
     filename = "report"
     styles = getSampleStyleSheet()
     data = []
+    landscape = False
+    hasfooter = False
     
+    def setLandscape(self, state):
+        self.landscape = state
+        
+    def enableFooter(self, state):
+        self.hasfooter = state
+        
     def setTitle(self, title):
         if title:
            self.title = title
@@ -73,13 +81,21 @@ class GenPDFRrepot():
             data.append(values)
         
         table = PDFTable(data,None,None,None,1)
-        table.setStyle(TableStyle([
+        ts = [
             ('ALIGNMENT', (0,0), (-1,-1), 'LEFT'),
             ('LINEBELOW', (0,0), (-1,-0), 2, colors.black),            
             ('LINEBELOW', (0,1), (-1,-1), 0.8, colors.lightgrey),
             ('FONT', (0,0), (-1, -1), "Helvetica", 8),
-            ('ROWBACKGROUNDS', (0,0), (-1, -1), [colors.whitesmoke, colors.white]),
-        ]))
+            ('ROWBACKGROUNDS', (0,0), (-1, -1), [colors.whitesmoke, colors.white]),            
+        ]
+        if self.hasfooter is True:
+            ts.append(('LINEABOVE', (0,-1), (-1,-1), 1, colors.red))
+            ts.append(('LINEBELOW', (0,-1), (-1,-1), 2, colors.red))            
+            ts.append(('LINEBELOW', (0,-1), (-1,-1), 0.8, colors.lightgrey))
+            ts.append(('FONT', (0,-1), (-1, -1), "Helvetica", 8))
+            
+        table.setStyle(TableStyle(ts))
+
         table.hAlign = "LEFT"
         self.data.append(table)
         
@@ -103,7 +119,9 @@ class GenPDFRrepot():
             elements.append(data)
         
         #elements.append(Paragraph("Created: %s" % datetime.now().strftime("%d/%m/%Y"), styles["Normal"]))        
-        #doc.pagesize = landscape(A4)
+        if self.landscape is True:
+            doc.pagesize = landscape(A4)
+        
         doc.build(elements, onFirstPage=self.myFirstPage, onLaterPages=self.myLaterPages)
         
         response = HttpResponse(mimetype='application/pdf')
@@ -170,11 +188,21 @@ def reports(request):
 @login_required
 def last_30_days(request, object_id=None, per_page="0"):
     pdfrpt = GenPDFRrepot()
-    pdfrpt.setTitle("RapidResponse MVP Kenya: CHW 30 Day Performance Report")
+    
+    pdfrpt.enableFooter(True)
+    thirty_days = timedelta(days=30)
+    sixty_days = timedelta(days=60)
+    today = date.today()
+    
+    duration_start = today - thirty_days
+    muac_duration_start = today - sixty_days
+    duration_end = today
+    
+    pdfrpt.setTitle("RapidResponse MVP Kenya: CHW 30 Day Performance Report, from %s to %s"%(duration_start, duration_end))
     if object_id is None:
         clinics = Provider.objects.values('clinic').distinct()
         for clinic in clinics:
-            queryset, fields = ReportCHWStatus.get_providers_by_clinic(clinic["clinic"])
+            queryset, fields = ReportCHWStatus.get_providers_by_clinic(duration_start, duration_end, muac_duration_start, clinic["clinic"])
             c = Facility.objects.filter(id=clinic["clinic"])[0]
             pdfrpt.setTableData(queryset, fields, c.name)
             if (int(per_page) == 1) is True:
@@ -183,7 +211,7 @@ def last_30_days(request, object_id=None, per_page="0"):
     else:
         if request.POST['clinic']:
             object_id = request.POST['clinic']
-        queryset, fields = ReportCHWStatus.get_providers_by_clinic(object_id)
+        queryset, fields = ReportCHWStatus.get_providers_by_clinic(duration_start, duration_end, muac_duration_start, object_id)
         c = Facility.objects.filter(id=object_id)[0]
         pdfrpt.setTableData(queryset, fields, c.name)
     
@@ -192,10 +220,12 @@ def last_30_days(request, object_id=None, per_page="0"):
 @login_required
 def patients_by_chw(request, object_id=None, per_page="0"):
     pdfrpt = GenPDFRrepot()
+    pdfrpt.setLandscape(True)
     pdfrpt.setTitle("RapidResponse MVP Kenya: Patients by CHW")
     if object_id is None:
         if request.POST and request.POST['zone']:
             providers = Case.objects.filter(zone=request.POST['zone']).values('provider', 'zone__name').distinct()
+            per_page = "1"
         else:
             providers = Case.objects.order_by("zone").values('provider', 'zone__name').distinct()
         for provider in providers:

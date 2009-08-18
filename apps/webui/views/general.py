@@ -718,6 +718,17 @@ def build_report(report_name, object_id):
     fields.append({"name": 'BEDNET', "column": None, "bit": "{{ object.malaria_bednet }}" })
     fields.append({"name": 'CMAM', "column": None, "bit": "{{ object.malnut_muac }}" })
     fields.append({"name": 'SYMPTOMS', "column": None, "bit": "{{ object.malnut_symptoms}}" })
+    """ fields.append({"name": 'Provider', "column": None, "bit": "{{ object.case.provider.get_name_display }}" })
+        fields.append({"name": 'Zone', "column": None, "bit": "{{ object.case.zone }}" })
+    
+    fields.append({"name": 'Village', "column": None, "bit": "{{ object.case.village }}" })
+    fields.append({"name": 'District', "column": None, "bit": "{{ object.case.district }}" })
+    fields.append({"name": 'Malnutrition', "column": None, "bit": "{{ object.malnut }}" })
+    fields.append({"name": 'Diarrhea', "column": None, "bit": "{{ object.diarrhea }}" })
+    fields.append({"name": 'Malaria', "column": None, "bit": "{{ object.malaria }}" })
+
+    fields.append({"name": 'Diagnosis', "column": None, "bit": "{{ object.diagnosis }}" })
+    """   
     return qs, fields
 
 def report_monitoring_csv(request, object_id, file_name):

@@ -365,18 +365,19 @@ class ReportCHWStatus(Report, models.Model):
         verbose_name = "CHW Perfomance Report"
         app_label = "mctc"
     @classmethod
-    def get_providers_by_clinic(cls, clinic_id=None):
-        thirty_days = timedelta(days=30)
-        sixty_days = timedelta(days=60)
-        today = date.today()
+    def get_providers_by_clinic(cls, duration_start, duration_end, muac_duration_start, clinic_id=None):
         
-        duration_start = today - thirty_days
-        muac_duration_start = duration_start = today - sixty_days
-        duration_end = today
     
         ps      = []
         fields  = []
         counter = 0
+        clinic_cases = 0
+        clinic_mrdt = 0
+        clinic_muac = 0
+        clinic_sent = 0
+        clinic_processed = 0
+        clinic_refused = 0
+        
         if clinic_id is not None:
             providers = Provider.list_by_clinic(clinic_id)
             for provider in providers:
@@ -385,20 +386,65 @@ class ReportCHWStatus(Report, models.Model):
                 p['counter'] = "%d"%counter
                 p['provider'] = provider
                 p['num_cases'] = Case.count_by_provider(provider)
-                p['num_malaria_reports'] = ReportMalaria.count_by_provider(provider, duration_end, duration_start)
-                muac_percentage  = ReportMalnutrition.count_by_provider(provider, duration_end, muac_duration_start)/Case.count_by_provider(provider)
-                p['num_muac_reports'] = "%s %%"%muac_percentage
-                p['sms_sent'] = MessageLog.count_by_provider(provider, duration_end, duration_start)
-                p['sms_processed'] = MessageLog.count_processed_by_provider(provider, duration_end, duration_start)
-                p['sms_refused'] = MessageLog.count_refused_by_provider(provider, duration_end, duration_start)
+                p_muac = ReportMalaria.count_by_provider(provider, duration_end, duration_start)
+                p['num_malaria_reports'] = p_muac
+                clinic_mrdt = clinic_mrdt + p_muac 
+                num_cases = Case.count_by_provider(provider)
+                clinic_cases = clinic_cases + num_cases
+                num_muac = ReportMalnutrition.count_by_provider(provider, duration_end, muac_duration_start)
+                clinic_muac = clinic_muac + num_muac
+                if num_cases == 0:
+                    muac_percentage = 0
+                else:
+                    muac_percentage  = round(float(float(num_muac)/float(num_cases))*100, 0)
+                p['num_muac_reports'] = "%d %% (%s/%s)"%(muac_percentage, num_muac, num_cases)
+                sms_sent = MessageLog.count_by_provider(provider, duration_end, duration_start)
+                clinic_sent = clinic_sent + sms_sent
+                p['sms_sent'] = sms_sent
+                sms_processed = MessageLog.count_processed_by_provider(provider, duration_end, duration_start)
+                clinic_processed = clinic_processed + sms_processed
+                p['sms_processed'] = sms_processed
+                sms_refused = MessageLog.count_refused_by_provider(provider, duration_end, duration_start)
+                clinic_refused = clinic_refused + sms_refused
+                p['sms_refused'] = sms_refused
                 if p['sms_sent'] != 0:
                     p['sms_rate'] = int(float(float(p['sms_processed'])/float(p['sms_sent'])*100))
                 else:
                     p['sms_rate'] = 0
                 #p['sms_rate'] = "%s%%"%p['sms_rate']
-                p['days_since_last_activity'] = MessageLog.days_since_last_activity(provider) 
+                last_activity = MessageLog.days_since_last_activity(provider)
+                if last_activity == "":
+                    p['days_since_last_activity'] = "No Activity"
+                else:
+                    p['days_since_last_activity'] = "%s days ago"%last_activity
                                     
                 ps.append(p)
+            
+            #ps = sorted(ps)
+            # Summary    
+            p = {}
+            p['counter'] = ""
+            p['provider'] = "Summary"
+            p['num_cases'] = clinic_cases
+            p['num_malaria_reports'] = clinic_mrdt
+            num_cases = clinic_cases
+            num_muac = clinic_muac
+            if num_cases == 0:
+                muac_percentage = 0
+            else:
+                muac_percentage  = round(float(float(num_muac)/float(num_cases))*100, 0)
+            p['num_muac_reports'] = "%d %% (%s/%s)"%(muac_percentage, num_muac, num_cases)
+            p['sms_sent'] = clinic_sent
+            p['sms_processed'] = clinic_processed
+            p['sms_refused'] = clinic_refused
+            if p['sms_sent'] != 0:
+                p['sms_rate'] = int(float(float(p['sms_processed'])/float(p['sms_sent'])*100))
+            else:
+                p['sms_rate'] = 0
+            #p['sms_rate'] = "%s%%"%p['sms_rate']
+            p['days_since_last_activity'] = "" 
+                                
+            ps.append(p)
                     # caseid +|Y lastname firstname | sex | dob/age | guardian | provider  | date
             fields.append({"name": '#', "column": None, "bit": "{{ object.counter }}" })
             fields.append({"name": 'PROVIDER', "column": None, "bit": "{{ object.provider }}" })
