@@ -65,17 +65,20 @@ class App (rapidsms.app.App):
         except TypeError:
             # didn't find a matching function
             # make sure we tell them that we got a problem
-            message.respond(_("Unknown or incorrectly formed command: %(msg)s... Please re-check your message") % {"msg":message.text[:10]})
+            #message.respond(_("Unknown or incorrectly formed command: %(msg)s... Please re-check your message") % {"msg":message.text[:10]})
+            self.int2dom(message, _("Unknown or incorrectly formed command: %(msg)s... Please re-check your message") % {"msg":message.text[:10]})
             return False
         try:
             handled = func(self, message, *captures)
         except HandlerFailed, e:
-            message.respond(e.message)
+            #message.respond(e.message)
+            self.int2dom(message,e.message)
             handled = True
         except Exception, e:
             # TODO: log this exception
             # FIXME: also, put the contact number in the config
-            message.respond(_("An error occurred. Please call 999-9999."))
+            #message.respond(_("An error occurred. Please call 0733202270."))
+            self.int2dom(message, _("An error occurred. Please call 0733202270."))
             elog(message.sender, message.text)
             raise
         message.was_handled = bool(handled)
@@ -122,7 +125,10 @@ class App (rapidsms.app.App):
                 "mobile"     : mobile,
                 "clinic"     : provider.clinic.name,
             })
-            message.respond(_(
+            #message.respond(_(
+            #    "Phone %(mobile)s is already registered to %(user_last_name)s, " +
+            #   "%(user_first_name)s. Reply with 'CONFIRM %(username)s'.") % info)
+            self.int2dom(message, _(
                 "Phone %(mobile)s is already registered to %(user_last_name)s, " +
                 "%(user_first_name)s. Reply with 'CONFIRM %(username)s'.") % info)
         else:
@@ -137,7 +143,10 @@ class App (rapidsms.app.App):
         return True
 
     def respond_to_join(self, message, info):
-        message.respond(
+        #message.respond(
+        #   _("%(mobile)s registered to @%(username)s " +
+        #      "(%(user_last_name)s, %(user_first_name)s) at %(clinic)s.") % info)
+        self.int2dom(message, 
             _("%(mobile)s registered to @%(username)s " +
               "(%(user_last_name)s, %(user_first_name)s) at %(clinic)s.") % info)
 
@@ -163,7 +172,8 @@ class App (rapidsms.app.App):
     #@authenticated
     def check_system_status (self, message):
         mobile   = message.peer
-        message.respond(_("Hello %s, system is up.")% mobile)
+        #message.respond(_("Hello %s, system is up.")% mobile)
+        self.int2dom(message, _("Hello %s, system is up.")% mobile)
         return True
     
     def respond_not_registered (self, message, target):
@@ -190,7 +200,8 @@ class App (rapidsms.app.App):
         except:
             self.respond_not_registered(message, target)
         sender = message.sender.username
-        return message.forward(mobile, "@%s> %s" % (sender, text))
+        #return message.forward(mobile, "@%s> %s" % (sender, text))
+        return self.int2dom(message, "@%s> %s" % (sender, text),mobile)
 
     # Register a new patient
     @keyword(r'new (\S+) (\S+) ([MF]) ([\d\-]+)( \D+)?( \d+)?( z\d+)?')
@@ -230,8 +241,13 @@ class App (rapidsms.app.App):
         ## check to see if the case already exists
         iscase = Case.objects.filter(first_name=info['first_name'], last_name=info['last_name'], provider=info['provider'], dob=info['dob'])
         if iscase:
-            message.respond(_(
-            "%(last_name)s, %(first_name)s has already been registered by you.") % info)
+            #message.respond(_(
+            #"%(last_name)s, %(first_name)s has already been registered by you.") % info)
+            info["PID"] = iscase[0].id
+            self.info(iscase[0].id)
+            self.info(info)
+            self.int2dom(message, _(
+            "%(last_name)s, %(first_name)s (+%(PID)s) has already been registered by %(provider)s.") % info)
             # TODO: log this message
             return True
         case = Case(**info)
@@ -244,7 +260,11 @@ class App (rapidsms.app.App):
         })
         if zone:
             info["zone"] = zone.name
-        message.respond(_(
+        #message.respond(_(
+        #    "New +%(id)s: %(last_name)s, %(first_name)s %(gender)s/%(age)s " +
+        #    "(%(guardian)s) %(zone)s") % info)
+        
+        self.int2dom(message, _(
             "New +%(id)s: %(last_name)s, %(first_name)s %(gender)s/%(age)s " +
             "(%(guardian)s) %(zone)s") % info)
         log(case, "patient_created")
@@ -273,7 +293,9 @@ class App (rapidsms.app.App):
                 "Cannot cancel +%s: case has diagnosis reports.") % ref_id)
 
         case.delete()
-        message.respond(_("Case +%s cancelled.") % ref_id)
+        #message.respond(_("Case +%s cancelled.") % ref_id)
+        self.int2dom(message, _("Case +%s cancelled.") % ref_id)
+        
         log(message.sender.provider, "case_cancelled")        
         return True
 
@@ -287,9 +309,13 @@ class App (rapidsms.app.App):
         case.save()
         info = new_provider.get_dictionary()
         info["ref_id"] = case.ref_id
-        message.respond(_("Case +%(ref_id)s transferred to @%(username)s " +
+        #message.respond(_("Case +%(ref_id)s transferred to @%(username)s " +
+         #                 "(%(user_last_name)s, %(user_last_name)s).") % info)
+        self.int2dom(message, _("Case +%(ref_id)s transferred to @%(username)s " +
                           "(%(user_last_name)s, %(user_last_name)s).") % info)
-        message.forward(_("Case +%s transferred to you from @%s.") % (
+        #message.forward(_("Case +%s transferred to you from @%s.") % (
+         #                 case.ref_id, provider.user.username))
+        self.int2dom(message, _("Case +%s transferred to you from @%s.") % (
                           case.ref_id, provider.user.username))
         log(case, "case_transferred")        
         return True
@@ -305,12 +331,14 @@ class App (rapidsms.app.App):
             item = "+%s %s %s. %s/%s" % (case.ref_id, case.last_name.upper(),
                 case.first_name[0].upper(), case.gender, case.age())
             if len(text) + len(item) + 2 >= self.MAX_MSG_LEN:
-                message.respond(text)
+                #message.respond(text)
+                self.int2dom(message, text)
                 text = ""
             if text: text += ", "
             text += item
         if text:
-            message.respond(text)
+            #message.respond(text)
+            self.int2dom(message, text)
         return True
 
     @keyword(r'list\s@')
@@ -321,12 +349,14 @@ class App (rapidsms.app.App):
         for provider in providers:
             item = "@%s %s" % (provider.id, provider.user.username)
             if len(text) + len(item) + 2 >= self.MAX_MSG_LEN:
-                message.respond(text)
+                #message.respond(text)
+                self.int2dom(message, text)
                 text = ""
             if text: text += ", "
             text += item
         if text:
-            message.respond(text)
+            #message.respond(text)
+            self.int2dom(message, text)
         return True
 
     @keyword(r's(?:how)? \+?(\d+)')
@@ -337,7 +367,11 @@ class App (rapidsms.app.App):
 
         if case.guardian: info["guardian"] = "(%s) " % case.guardian
         if case.zone: info["zone"] = case.zone.name
-        message.respond(_(
+        """ message.respond(_(
+            "+%(id)s %(status)s %(last_name)s, %(first_name)s "
+            "%(gender)s/%(age)s %(guardian)s%(zone)s") % info)
+        """
+        self.int2dom(message, _(
             "+%(id)s %(status)s %(last_name)s, %(first_name)s "
             "%(gender)s/%(age)s %(guardian)s%(zone)s") % info)
         return True
@@ -398,7 +432,8 @@ class App (rapidsms.app.App):
         if height: msg += ", %.1d cm" % height
         if observed: msg += ", " + info["observed"]
 
-        message.respond("MUAC> " + msg)
+        #message.respond("MUAC> " + msg)
+        self.int2dom(message, "MUAC> " + msg)
 
         if report.status in (report.MODERATE_STATUS,
                            report.SEVERE_STATUS,
@@ -419,7 +454,8 @@ class App (rapidsms.app.App):
     def note_case (self, message, ref_id, note):
         case = self.find_case(ref_id)
         CaseNote(case=case, created_by=message.sender, text=note).save()
-        message.respond(_("Note added to case +%s.") % ref_id)
+        #message.respond(_("Note added to case +%s.") % ref_id)
+        self.int2dom(message, _("Note added to case +%s.") % ref_id)
         log(case, "note_added")        
         return True
 
@@ -468,8 +504,8 @@ class App (rapidsms.app.App):
         if info["labs_text"]:
             info["labs_text"] = "%sLabs: %s" % (info["diagnosis"] and " " or "", info["labs_text"])
 
-        message.respond(_("D> +%(ref_id)s %(first_name_short)s.%(last_name)s %(diagnosis)s%(labs_text)s") % info)
-
+        #message.respond(_("D> +%(ref_id)s %(first_name_short)s.%(last_name)s %(diagnosis)s%(labs_text)s") % info)
+        self.int2dom(message, _("D> +%(ref_id)s %(first_name_short)s.%(last_name)s %(diagnosis)s%(labs_text)s") % info)
         # add in the forward of instructions to the case provider
         # if that it is not the reporter of the issue        
 
@@ -483,7 +519,8 @@ class App (rapidsms.app.App):
             if provider != case.provider:
                 # there's a different provider
                 info = {"ref_id":ref_id, "instructions":(", ".join(instructions))}
-                message.forward(case.provider.mobile, "D> +%(ref_id)s %(instructions)s" % info)
+                #message.forward(case.provider.mobile, "D> +%(ref_id)s %(instructions)s" % info)
+                self.int2dom(message, "D> +%(ref_id)s %(instructions)s" % info,case.provider.mobile)
                 
         log(case, "diagnosis_taken")        
         return True        
@@ -563,10 +600,12 @@ class App (rapidsms.app.App):
                       "%(gender)s/%(months)s (%(village)s) has MALARIA%(danger)s. "\
                       "CHW: @%(provider_user)s %(provider_mobile)s" % info)
 
-        message.respond(msg)
+        #message.respond(msg)
+        self.int2dom(message, msg)
         recipients = report.get_alert_recipients()
         for recipient in recipients:
-            message.forward(recipient.mobile, alert)
+            #message.forward(recipient.mobile, alert)
+            self.int2dom(message, alert,recipient.mobile)
 
         log(case, "mrdt_taken")        
         return True
@@ -595,7 +634,8 @@ class App (rapidsms.app.App):
             msg = _("%(diagnosis_msg)s. +%(ref_id)s %(last_name)s, %(first_name_short)s, %(gender)s/%(months)s (%(guardian)s). %(days)s, %(ors)s") % info
             if report.observed.all().count() > 0: msg += ", " + info["observed"]
             
-            message.respond("DIARRHEA> " + msg)
+            #message.respond("DIARRHEA> " + msg)
+            self.int2dom(message, "DIARRHEA> " + msg)
 
         if report.status in (report.MODERATE_STATUS,
                            report.SEVERE_STATUS,
@@ -607,7 +647,8 @@ class App (rapidsms.app.App):
                 for recipient in query:
                     if recipient in recipients: continue
                     recipients.append(recipient)
-                    message.forward(recipient.mobile, alert)
+                    #message.forward(recipient.mobile, alert)
+                    self.int2dom(message, alert, recipient.mobile)
         log(case, "diarrhea_fu_taken")
         return True
 
@@ -639,7 +680,8 @@ class App (rapidsms.app.App):
 
         if observed: msg += ", " + info["observed"]
 
-        message.respond("DIARRHEA> " + msg)
+        #message.respond("DIARRHEA> " + msg)
+        self.int2dom(message, "DIARRHEA> " + msg)
 
         if report.status in (report.MODERATE_STATUS,
                            report.SEVERE_STATUS,
@@ -651,7 +693,8 @@ class App (rapidsms.app.App):
                 for recipient in query:
                     if recipient in recipients: continue
                     recipients.append(recipient)
-                    message.forward(recipient.mobile, alert)
+                    #message.forward(recipient.mobile, alert)
+                    self.int2dom(message, alert,recipient.mobile)
         log(case, "diarrhea_taken")
         return True
 
@@ -692,3 +735,8 @@ class App (rapidsms.app.App):
                     observed.append(obj)
         return observed, choices
 
+    def int2dom(self, message, text, mobile=None):
+        if mobile is None:
+            mobile = message.peer
+        mobile = mobile.replace("+254","0")
+        message.forward(mobile, text)

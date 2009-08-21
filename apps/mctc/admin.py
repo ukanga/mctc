@@ -30,8 +30,9 @@ except admin.sites.NotRegistered:
 #admin.site.register(User, ProviderAdmin)
 
 class CaseAdmin(admin.ModelAdmin):
-    list_display = ("ref_id", "first_name", "last_name", "gender", "dob","zone","created_at")
-    search_fields = ['ref_id']
+    list_display = ("ref_id", "first_name", "last_name", "gender", "dob","zone","created_at","provider")
+    search_fields = ['ref_id', 'first_name', 'last_name', 'provider__user__first_name', 'provider__user__last_name']
+    list_filter = ("provider",)
 
 class TheProviderAdmin(admin.ModelAdmin):
     list_display = ("get_name_display","clinic")

@@ -32,6 +32,7 @@ urlpatterns = patterns('',
     (r'^patients_by_chw/$', "apps.webui.views.report.patients_by_chw"),
     (r'^patients_by_chw/(?P<object_id>\d*)$', "apps.webui.views.report.patients_by_chw"),
     (r'^patients_by_chw/per_page/(?P<per_page>\d*)$', "apps.webui.views.report.patients_by_chw"),
+    (r'^patients_by_chw/(?P<object_id>\d*)/(?P<rformat>[a-z]*)$', "apps.webui.views.report.patients_by_chw"),
     # since we can't change settings, we have to do this as accounts/login
     (r'^accounts/login/$', "apps.webui.views.login.login"),    
     (r'^logout/$', "apps.webui.views.login.logout"),

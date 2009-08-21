@@ -6,7 +6,7 @@ from apps.webui.shortcuts import as_html, login_required
 from apps.mctc.models.logs import log
 from apps.mctc.models.general import Case, Zone, Provider, Facility
 from apps.mctc.models.reports import ReportCHWStatus, ReportAllPatients
-
+from apps.webui.views.general import next_month
 from django.utils.translation import ugettext_lazy as _
 
 try:
@@ -176,17 +176,27 @@ def reports(request):
         tmp['name'] = provider['provider__user__last_name'] + " " + provider['provider__user__first_name']
         tmp['zone'] = provider['zone']
         providers.append(tmp)  
+        
+    now = datetime.today()
+    first   = Case.objects.order_by('created_at')[:1][0]
+    date    = first.created_at
+
+    months=[]
+    while ((now - date).days > 0):
+        months.append({'id': date.strftime("%m%Y"), 'label': date.strftime("%B %Y"), 'date': date})
+        date = next_month(date)
     
     context = {
         "app": app,
         "clinics": clinics,
         "providers": providers,
         "zones": zones,
+        "months": months
     }
     return as_html(request, "reports/reports.html", context)
 
 @login_required
-def last_30_days(request, object_id=None, per_page="0"):
+def last_30_days(request, object_id=None, per_page="0", rformat="pdf"):
     pdfrpt = GenPDFRrepot()
     
     pdfrpt.enableFooter(True)
@@ -213,16 +223,22 @@ def last_30_days(request, object_id=None, per_page="0"):
             object_id = request.POST['clinic']
         queryset, fields = ReportCHWStatus.get_providers_by_clinic(duration_start, duration_end, muac_duration_start, object_id)
         c = Facility.objects.filter(id=object_id)[0]
+        
+        if rformat == "csv" or (request.POST and request.POST["format"].lower() == "csv"):
+            file_name = c.name + ".csv"
+            file_name = file_name.replace(" ","_").replace("'","")
+            return handle_csv(request, queryset, fields, file_name)
+        
         pdfrpt.setTableData(queryset, fields, c.name)
     
     return pdfrpt.render()
 
 @login_required
-def patients_by_chw(request, object_id=None, per_page="0"):
+def patients_by_chw(request, object_id=None, per_page="0", rformat="pdf"):
     pdfrpt = GenPDFRrepot()
     pdfrpt.setLandscape(True)
     pdfrpt.setTitle("RapidResponse MVP Kenya: Patients by CHW")
-    if object_id is None:
+    if object_id is None:        
         if request.POST and request.POST['zone']:
             providers = Case.objects.filter(zone=request.POST['zone']).values('provider', 'zone__name').distinct()
             per_page = "1"
@@ -236,10 +252,35 @@ def patients_by_chw(request, object_id=None, per_page="0"):
                 pdfrpt.setPageBreak()
                 pdfrpt.setFilename("report_per_page")
     else:        
-        if request.POST['provider']:
+        if request.POST and request.POST['provider']:
             object_id = request.POST['provider']
+        
         queryset, fields = ReportAllPatients.by_provider(object_id)
+        
         c = Provider.objects.get(id=object_id)
+        
+        if rformat == "csv" or (request.POST and request.POST["format"].lower() == "csv"):
+            file_name = c.get_name_display() + ".csv"
+            file_name = file_name.replace(" ","_").replace("'","")
+            return handle_csv(request, queryset, fields, file_name)
+        
         pdfrpt.setTableData(queryset, fields, c.get_name_display())
     
     return pdfrpt.render()
+
+def handle_csv(request, queryset, fields, file_name):
+    output = StringIO.StringIO()
+    csvio = csv.writer(output)
+    header = False
+    for row in queryset:
+        ctx = Context({"object": row })
+        if not header:
+            csvio.writerow([f["name"] for f in fields])
+            header = True
+        values = [ Template(h["bit"]).render(ctx) for h in fields ]
+        csvio.writerow(values)
+
+    response = HttpResponse(mimetype='text/csv')
+    response['Content-Disposition'] = "attachment; filename=%s" % file_name
+    response.write(output.getvalue())
+    return response

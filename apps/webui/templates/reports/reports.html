@@ -17,7 +17,9 @@
 					    <option value="{{ clinic.clinic__id }}">{{ clinic.clinic__name }}</option>
 					{% endfor %}
 				</select>
-				<input type="submit" value="Get Report" />
+				
+				<input type="submit" name="format" value="Get Report" />
+				<input type="submit" name="format" value="CSV" />
 			</form>
 				  			
   		</li>
@@ -36,7 +38,8 @@
 						
 					{% endfor %}
 				</select>
-				<input type="submit" value="Get Report" />
+				<input type="submit" name="format" value="Get Report" />
+				<input type="submit" name="format" value="CSV" />
 			</form>
 			<form action="/patients_by_chw/" method="post">
 				
@@ -45,9 +48,17 @@
 						<option value="{{ zone.zone }}">{{ zone.zone__name }}</option>						
 					{% endfor %}
 				</select>
-				<input type="submit" value="Get Report" />
+				<input type="submit" name="format" value="Get Report" />
+				
 			</form>
 		</li>
 	</ul>
+	<h2>Monitoring</h2>
+<p>General monitoring of {{ app.name }} activities.</p>
+<ul>
+{% for month in months %}
+<li><strong>{{ month.label }}</strong> Report, <a href="/report/monitoring_csv/{{ month.id }}">CSV</a></li>
+{% endfor %}
+</ul>
 
 {% endblock %}
